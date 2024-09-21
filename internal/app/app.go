@@ -1,11 +1,11 @@
 package app
 
 import (
+	"fmt"
 	"go-waf/config"
 	delivery_http "go-waf/internal/delivery/http"
 	"go-waf/pkg/httpserver"
 	"go-waf/pkg/logger"
-	"log"
 	"os"
 	"time"
 )
@@ -36,7 +36,7 @@ func (a *App) execute() {
 
 func (a *App) Start() {
 	start := time.Now()
-	log.Println("[Info] HttpServer listen and serve at ", a.config.ADDR)
+	logger.Logger(fmt.Sprintf("[Info] HttpServer listen and serve at %s", a.config.ADDR)).Info()
 	a.execute()
 
 	logger.Logger(map[string]any{

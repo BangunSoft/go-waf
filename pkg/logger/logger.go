@@ -2,8 +2,10 @@ package logger
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
+	"runtime"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -54,12 +56,16 @@ func SetOutput(output io.Writer) {
 	logger.driver.SetOutput(output)
 }
 
-func Logger(logs ...any) *logDriver {
+func Logger(logs ...interface{}) *logDriver {
 	if len(logs) == 0 || logs[0] == nil {
 		return logger
 	}
 
-	logger.message = logs
+	_, filename, line, _ := runtime.Caller(1)
+	logger.message = map[string]interface{}{
+		"caller": fmt.Sprintf("%s:%d", filename, line),
+		"log":    fmt.Sprintf("%v", logs),
+	}
 	logger.jsonize()
 
 	return logger
@@ -70,40 +76,45 @@ func (l *logDriver) jsonize() {
 		return
 	}
 
-	var err error
-	logger.message, err = json.Marshal(logger.message)
-
+	message, err := json.Marshal(logger.message)
 	if err != nil {
 		log.Panicln("[panic] logger error. Causer: ", err)
 	}
+
+	logger.message = string(message)
 }
 
 func (l *logDriver) Debug() {
 	if logger.message != nil {
 		l.driver.Debug(l.message)
+		l.message = nil
 	}
 }
 
 func (l *logDriver) Info() {
 	if logger.message != nil {
 		l.driver.Info(l.message)
+		l.message = nil
 	}
 }
 
 func (l *logDriver) Warn() {
 	if logger.message != nil {
 		l.driver.Warn(l.message)
+		l.message = nil
 	}
 }
 
 func (l *logDriver) Error() {
 	if logger.message != nil {
 		l.driver.Error(l.message)
+		l.message = nil
 	}
 }
 
 func (l *logDriver) Fatal() {
 	if logger.message != nil {
 		l.driver.Fatal(l.message)
+		l.message = nil
 	}
 }
