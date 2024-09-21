@@ -32,8 +32,6 @@ func (a *App) execute() {
 
 	server.SetHandler(router.GetHandler())
 	server.Start()
-
-	log.Println("[info] app stoped. causer: ", <-a.notify)
 }
 
 func (a *App) Start() {
@@ -44,6 +42,6 @@ func (a *App) Start() {
 	logger.Logger(map[string]any{
 		"message":       "App stopped",
 		"stopped_after": time.Since(start),
-		"causer":        a.notify,
+		"causer":        <-a.notify,
 	}).Info()
 }
