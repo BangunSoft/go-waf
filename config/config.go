@@ -22,6 +22,10 @@ type Config struct {
 	RATELIMIT_SECOND int  `env:"RATELIMIT_SECOND" env-default:"1"`
 	RATELIMIT_MAX    uint `env:"RATELIMIT_MAX" env-default:"5"`
 
+	USE_CACHE    string `env:"USE_CACHE" env-default:"false"`
+	CACHE_TTL    int    `env:"CACHE_TTL" env-default:"1209600"`   // default 2 week
+	CACHE_DRIVER string `env:"CACHE_DRIVER" env-default:"memory"` // TODO: Redis and File
+
 	// debug
 	GIN_MODE  string `env:"GIN_MODE" env-default:"debug"`
 	LOG_LEVEL string `env:"LOG_LEVEL" env-default:"debug"`

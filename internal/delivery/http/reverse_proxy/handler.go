@@ -1,4 +1,4 @@
-package http_proxy_handler
+package http_reverseproxy_handler
 
 import (
 	"bytes"
@@ -25,7 +25,7 @@ func NewHttpHandler(config *config.Config, handler *gin.Engine) *Handler {
 	}
 }
 
-func (h *Handler) Proxy(c *gin.Context) {
+func (h *Handler) ReverseProxy(c *gin.Context) {
 	remote, err := url.Parse(h.config.HOST_DESTINATION)
 	if err != nil {
 		panic(err)

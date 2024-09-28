@@ -2,7 +2,7 @@ package delivery_http
 
 import (
 	"go-waf/config"
-	http_proxy_handler "go-waf/internal/delivery/http/proxy"
+	http_reverseproxy_handler "go-waf/internal/delivery/http/reverse_proxy"
 	"go-waf/internal/middleware/ratelimit"
 
 	"github.com/gin-gonic/gin"
@@ -33,12 +33,12 @@ func (h *Router) setRouter() {
 	}
 
 	// initial handler
-	proxyHandler := http_proxy_handler.NewHttpHandler(h.config, h.handler)
+	proxyHandler := http_reverseproxy_handler.NewHttpHandler(h.config, h.handler)
 
 	// set handler
 	h.handler.Any("/*path", func(ctx *gin.Context) {
 		if ctx.Param("path") != "/ping" {
-			proxyHandler.Proxy(ctx)
+			proxyHandler.ReverseProxy(ctx)
 			return
 		} else {
 			ctx.String(200, "PONG")
