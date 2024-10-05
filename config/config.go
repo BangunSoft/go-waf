@@ -26,6 +26,12 @@ type Config struct {
 	CACHE_TTL    int    `env:"CACHE_TTL" env-default:"1209600"`   // default 2 week
 	CACHE_DRIVER string `env:"CACHE_DRIVER" env-default:"memory"` // TODO: Redis and File
 
+	REDIS_ADDR string `env:"REDIS_ADDR" env-default:"localhost:6379"`
+	REDIS_SSL  bool   `env:"REDIS_SSL" env-default:"false"`
+	REDIS_USER string `env:"REDIS_USER"`
+	REDIS_PASS string `env:"REDIS_PASS"`
+	REDIS_DB   int    `env:"REDIS_DB" env-default:"0"`
+
 	// debug
 	GIN_MODE  string `env:"GIN_MODE" env-default:"debug"`
 	LOG_LEVEL string `env:"LOG_LEVEL" env-default:"debug"`
