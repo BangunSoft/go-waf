@@ -5,10 +5,10 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"go-waf/config"
-	"go-waf/internal/interface/service"
-	file_cache "go-waf/internal/service/cache/file"
-	memory_cache "go-waf/internal/service/cache/memory"
-	redis_cache "go-waf/internal/service/cache/redis"
+	"go-waf/internal/interface/repository"
+	file_cache "go-waf/internal/repository/file"
+	memory_cache "go-waf/internal/repository/memory"
+	redis_cache "go-waf/internal/repository/redis"
 	"go-waf/pkg/logger"
 	"os"
 	"time"
@@ -18,11 +18,11 @@ import (
 
 type CacheService struct {
 	config *config.Config
-	driver service.CacheInterface
+	driver repository.CacheInterface
 }
 
 func NewCacheService(config *config.Config) *CacheService {
-	var driver service.CacheInterface
+	var driver repository.CacheInterface
 	switch config.CACHE_DRIVER {
 	case "redis":
 		rds := redis.NewClient(&redis.Options{
