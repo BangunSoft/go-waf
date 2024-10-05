@@ -7,4 +7,5 @@ type CacheInterface interface {
 	Get(string) (interface{}, bool)
 	Pop(string) (interface{}, bool)
 	Remove(string)
+	GetTTL(string) (time.Duration, bool)
 }

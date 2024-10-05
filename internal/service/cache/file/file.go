@@ -3,6 +3,7 @@ package file_cache
 import (
 	"encoding/json"
 	"fmt"
+	"go-waf/pkg/logger"
 	"os"
 	"path/filepath"
 	"sync"
@@ -12,6 +13,12 @@ import (
 type FileCache struct {
 	cacheDir string
 	mu       sync.RWMutex
+}
+
+// CacheItem represents an item stored in the cache, along with its expiration time.
+type CacheItem struct {
+	Value      interface{} `json:"value"`
+	Expiration int64       `json:"expiration"` // Unix timestamp
 }
 
 // NewFileCache creates a new FileCache instance with the specified directory.
@@ -24,16 +31,19 @@ func (c *FileCache) Set(key string, value interface{}, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	serializedValue, err := json.Marshal(value)
+	serializedValue, err := json.Marshal(CacheItem{
+		Value:      value,
+		Expiration: time.Now().Add(ttl).Unix(), // Set the expiration time
+	})
 	if err != nil {
-		fmt.Printf("Error serializing value: %v\n", err)
+		logger.Logger("Error serializing value: ", err).Warn()
 		return
 	}
 
 	cacheFilePath := c.getFilePath(key)
 	err = os.WriteFile(cacheFilePath, serializedValue, 0644)
 	if err != nil {
-		fmt.Printf("Error writing to cache file: %v\n", err)
+		logger.Logger("Error writing to cache file: ", err).Warn()
 	}
 
 	// Optionally, you can implement a mechanism to clean up expired files
@@ -51,18 +61,24 @@ func (c *FileCache) Get(key string) (interface{}, bool) {
 		if os.IsNotExist(err) {
 			return nil, false // Key does not exist
 		}
-		fmt.Printf("Error reading cache file: %v\n", err)
+		logger.Logger("Error reading cache file: ", err).Warn()
 		return nil, false
 	}
 
-	var value interface{}
-	err = json.Unmarshal(data, &value)
+	var item CacheItem
+	err = json.Unmarshal(data, &item)
 	if err != nil {
-		fmt.Printf("Error deserializing value: %v\n", err)
+		logger.Logger("Error deserializing value: ", err).Error()
 		return nil, false
 	}
 
-	return value, true
+	// Check if the item is expired
+	if time.Now().Unix() > item.Expiration {
+		c.Remove(key) // Optionally remove expired item
+		return nil, false
+	}
+
+	return item.Value, true
 }
 
 // Pop removes and returns the item with the specified key from the file cache.
@@ -76,23 +92,28 @@ func (c *FileCache) Pop(key string) (interface{}, bool) {
 		if os.IsNotExist(err) {
 			return nil, false // Key does not exist
 		}
-		fmt.Printf("Error reading cache file: %v\n", err)
+		logger.Logger("Error reading cache file: ", err).Error()
 		return nil, false
 	}
 
 	err = os.Remove(cacheFilePath)
 	if err != nil {
-		fmt.Printf("Error removing cache file: %v\n", err)
+		logger.Logger("Error removing cache file: ", err).Error()
 	}
 
-	var value interface{}
-	err = json.Unmarshal(data, &value)
+	var item CacheItem
+	err = json.Unmarshal(data, &item)
 	if err != nil {
-		fmt.Printf("Error deserializing value: %v\n", err)
+		logger.Logger("Error deserializing value: ", err).Error()
 		return nil, false
 	}
 
-	return value, true
+	// Check if the item is expired
+	if time.Now().Unix() > item.Expiration {
+		return nil, false
+	}
+
+	return item.Value, true
 }
 
 // Remove removes the item with the specified key from the file cache.
@@ -103,8 +124,39 @@ func (c *FileCache) Remove(key string) {
 	cacheFilePath := c.getFilePath(key)
 	err := os.Remove(cacheFilePath)
 	if err != nil {
-		fmt.Printf("Error removing cache file: %v\n", err)
+		logger.Logger("Error removing cache file: ", err).Warn()
 	}
+}
+
+// GetTTL returns the remaining time before the specified key expires.
+func (c *FileCache) GetTTL(key string) (time.Duration, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	cacheFilePath := c.getFilePath(key)
+	data, err := os.ReadFile(cacheFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, false // Key does not exist
+		}
+		logger.Logger("Error reading cache file: ", err).Error()
+		return 0, false
+	}
+
+	var item CacheItem
+	err = json.Unmarshal(data, &item)
+	if err != nil {
+		logger.Logger("Error deserializing value: ", err).Error()
+		return 0, false
+	}
+
+	// Calculate remaining TTL
+	remaining := time.Until(time.Unix(item.Expiration, 0))
+	if remaining < 0 {
+		return 0, false // Item is expired
+	}
+
+	return remaining, true
 }
 
 // getFilePath constructs the file path for a given key.

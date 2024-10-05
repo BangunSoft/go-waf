@@ -12,6 +12,7 @@ import (
 
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 type RateLimit struct {
@@ -66,6 +67,13 @@ func (s *RateLimit) RateLimit() gin.HandlerFunc {
 		s.store = ratelimit.RedisStore(&ratelimit.RedisOptions{
 			Rate:  s.rate,
 			Limit: s.limit,
+			RedisClient: redis.NewClient(&redis.Options{
+				Addr:     s.config.REDIS_ADDR,
+				Username: s.config.REDIS_USER,
+				Password: s.config.REDIS_PASS,
+				DB:       s.config.REDIS_DB, // use default DB
+			}),
+			PanicOnErr: false,
 		})
 	default: // default in memory
 		s.store = ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{

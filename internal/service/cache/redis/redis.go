@@ -3,7 +3,7 @@ package redis_cache
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"go-waf/pkg/logger"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -27,13 +27,13 @@ func NewCache(ctx context.Context, redisClient *redis.Client) *TTLCache {
 func (c *TTLCache) Set(key string, value interface{}, ttl time.Duration) {
 	serializedValue, err := json.Marshal(value)
 	if err != nil {
-		fmt.Printf("Error serializing value: %v\n", err)
+		logger.Logger("Error serializing value: ", err).Error()
 		return
 	}
 
 	err = c.client.Set(c.ctx, key, serializedValue, ttl).Err()
 	if err != nil {
-		fmt.Printf("Error setting value in Redis: %v\n", err)
+		logger.Logger("Error setting value in Redis: ", err).Error()
 	}
 }
 
@@ -45,14 +45,14 @@ func (c *TTLCache) Get(key string) (interface{}, bool) {
 		return nil, false
 	} else if err != nil {
 		// Other Redis error
-		fmt.Printf("Error getting value from Redis: %v\n", err)
+		logger.Logger("Error getting value from Redis: ", err).Error()
 		return nil, false
 	}
 
 	var value interface{}
 	err = json.Unmarshal([]byte(serializedValue), &value)
 	if err != nil {
-		fmt.Printf("Error deserializing value: %v\n", err)
+		logger.Logger("Error deserializing value: ", err).Error()
 		return nil, false
 	}
 
@@ -67,14 +67,14 @@ func (c *TTLCache) Pop(key string) (interface{}, bool) {
 		return nil, false
 	} else if err != nil {
 		// Other Redis error
-		fmt.Printf("Error getting value from Redis: %v\n", err)
+		logger.Logger("Error getting value from Redis: ", err).Error()
 		return nil, false
 	}
 
 	var value interface{}
 	err = json.Unmarshal([]byte(serializedValue), &value)
 	if err != nil {
-		fmt.Printf("Error deserializing value: %v\n", err)
+		logger.Logger("Error deserializing value: ", err).Error()
 		return nil, false
 	}
 
@@ -85,6 +85,21 @@ func (c *TTLCache) Pop(key string) (interface{}, bool) {
 func (c *TTLCache) Remove(key string) {
 	err := c.client.Del(c.ctx, key).Err()
 	if err != nil {
-		fmt.Printf("Error removing key from Redis: %v\n", err)
+		logger.Logger("Error removing key from Redis: ", err).Error()
 	}
+}
+
+// GetTTL returns the remaining time before the specified key expires.
+func (c *TTLCache) GetTTL(key string) (time.Duration, bool) {
+	ttl, err := c.client.TTL(c.ctx, key).Result()
+	if err == redis.Nil {
+		// Key does not exist
+		return 0, false
+	} else if err != nil {
+		// Other Redis error
+		logger.Logger("Error getting TTL from Redis: ", err).Error()
+		return 0, false
+	}
+
+	return ttl, true
 }

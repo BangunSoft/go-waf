@@ -22,9 +22,9 @@ type Config struct {
 	RATELIMIT_SECOND int  `env:"RATELIMIT_SECOND" env-default:"1"`
 	RATELIMIT_MAX    uint `env:"RATELIMIT_MAX" env-default:"5"`
 
-	USE_CACHE    string `env:"USE_CACHE" env-default:"false"`
-	CACHE_TTL    int    `env:"CACHE_TTL" env-default:"1209600"`   // default 2 week
-	CACHE_DRIVER string `env:"CACHE_DRIVER" env-default:"memory"` // TODO: Redis and File
+	USE_CACHE    bool   `env:"USE_CACHE" env-default:"false"`
+	CACHE_TTL    int    `env:"CACHE_TTL" env-default:"1209600"` // default 2 week
+	CACHE_DRIVER string `env:"CACHE_DRIVER" env-default:"memory"`
 
 	REDIS_ADDR string `env:"REDIS_ADDR" env-default:"localhost:6379"`
 	REDIS_SSL  bool   `env:"REDIS_SSL" env-default:"false"`

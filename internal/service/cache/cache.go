@@ -2,6 +2,8 @@ package service_cache
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"go-waf/config"
 	"go-waf/internal/interface/service"
 	file_cache "go-waf/internal/service/cache/file"
@@ -15,11 +17,11 @@ import (
 )
 
 type CacheService struct {
-	config config.Config
+	config *config.Config
 	driver service.CacheInterface
 }
 
-func NewCacheService(config config.Config) *CacheService {
+func NewCacheService(config *config.Config) *CacheService {
 	var driver service.CacheInterface
 	switch config.CACHE_DRIVER {
 	case "redis":
@@ -31,8 +33,8 @@ func NewCacheService(config config.Config) *CacheService {
 		})
 		driver = redis_cache.NewCache(context.Background(), rds)
 	case "file":
-		cachePath := "cache"
-		cacheStat, err := os.Stat(cachePath)
+		cachePath := "cache/"
+		_, err := os.Stat(cachePath)
 		if err != nil {
 			logger.Logger("Cache path does'nt exists. Create cache path...").Info()
 			err = os.MkdirAll(cachePath, 0755)
@@ -41,6 +43,7 @@ func NewCacheService(config config.Config) *CacheService {
 			}
 		}
 
+		cacheStat, _ := os.Stat(cachePath)
 		if !cacheStat.IsDir() {
 			logger.Logger("Cache path is file!").Fatal()
 		}
@@ -56,18 +59,27 @@ func NewCacheService(config config.Config) *CacheService {
 	}
 }
 
+func (s *CacheService) generateKey(key string) string {
+	hash := md5.Sum([]byte(key))
+	return hex.EncodeToString(hash[:])
+}
+
 func (s *CacheService) Set(key string, value interface{}, duration time.Duration) {
-	s.driver.Set(key, value, duration)
+	s.driver.Set(s.generateKey(key), value, duration)
 }
 
 func (s *CacheService) Get(key string) (interface{}, bool) {
-	return s.driver.Get(key)
+	return s.driver.Get(s.generateKey(key))
 }
 
 func (s *CacheService) Pop(key string) (interface{}, bool) {
-	return s.driver.Pop(key)
+	return s.driver.Pop(s.generateKey(key))
 }
 
 func (s *CacheService) Remove(key string) {
-	s.driver.Remove(key)
+	s.driver.Remove(s.generateKey(key))
+}
+
+func (s *CacheService) GetTTL(key string) (time.Duration, bool) {
+	return s.driver.GetTTL(s.generateKey(key))
 }

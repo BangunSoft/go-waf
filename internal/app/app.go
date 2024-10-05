@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go-waf/config"
 	delivery_http "go-waf/internal/delivery/http"
+	service_cache "go-waf/internal/service/cache"
 	"go-waf/pkg/httpserver"
 	"go-waf/pkg/logger"
 	"os"
@@ -28,7 +29,8 @@ func NewApp(config *config.Config) *App {
 
 func (a *App) execute() {
 	server := httpserver.NewHttpServer(a.config)
-	router := delivery_http.NewHttpRouter(a.config)
+	cacheHandler := service_cache.NewCacheService(a.config)
+	router := delivery_http.NewHttpRouter(a.config, cacheHandler)
 
 	server.SetHandler(router.GetHandler())
 	server.Start()

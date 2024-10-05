@@ -116,3 +116,23 @@ func (c *TTLCache[K, V]) Pop(key K) (V, bool) {
 	// Otherwise return the value and true.
 	return item.value, true
 }
+
+// GetTTL returns the remaining time before the specified key expires.
+func (c *TTLCache[K, V]) GetTTL(key K) (time.Duration, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	item, found := c.items[key]
+	if !found {
+		return 0, false // Key does not exist
+	}
+
+	if item.isExpired() {
+		delete(c.items, key) // Optionally remove expired item
+		return 0, false
+	}
+
+	// Calculate remaining TTL
+	remaining := time.Until(item.expiry)
+	return remaining, true
+}

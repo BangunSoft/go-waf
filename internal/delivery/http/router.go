@@ -3,6 +3,7 @@ package delivery_http
 import (
 	"go-waf/config"
 	http_reverseproxy_handler "go-waf/internal/delivery/http/reverse_proxy"
+	"go-waf/internal/interface/service"
 	"go-waf/internal/middleware/ratelimit"
 
 	"github.com/gin-gonic/gin"
@@ -12,15 +13,17 @@ type Router struct {
 	config  *config.Config
 	handler *gin.Engine
 
-	ratelimiter *ratelimit.RateLimit
+	rateLimiter  *ratelimit.RateLimit
+	cacheHandler service.CacheInterface
 }
 
-func NewHttpRouter(config *config.Config) *Router {
+func NewHttpRouter(config *config.Config, cacheHandler service.CacheInterface) *Router {
 	return &Router{
 		config: config,
 
-		handler:     gin.Default(),
-		ratelimiter: ratelimit.NewRateLimit(config),
+		handler:      gin.Default(),
+		rateLimiter:  ratelimit.NewRateLimit(config),
+		cacheHandler: cacheHandler,
 	}
 }
 
@@ -28,18 +31,21 @@ func (h *Router) setRouter() {
 	// ratelimiter
 	if h.config.USE_RATELIMIT {
 		// TODO: add redis as driver option
-		h.ratelimiter.Driver("memory")
-		h.handler.Use(h.ratelimiter.RateLimit())
+		if h.config.CACHE_DRIVER == "redis" {
+			h.rateLimiter.Driver("redis")
+		} else {
+			h.rateLimiter.Driver("memory")
+		}
+		h.handler.Use(h.rateLimiter.RateLimit())
 	}
 
 	// initial handler
-	proxyHandler := http_reverseproxy_handler.NewHttpHandler(h.config, h.handler)
+	proxyHandler := http_reverseproxy_handler.NewHttpHandler(h.config, h.handler, h.cacheHandler)
 
 	// set handler
 	h.handler.Any("/*path", func(ctx *gin.Context) {
 		if ctx.Param("path") != "/ping" {
-			proxyHandler.ReverseProxy(ctx)
-			return
+			proxyHandler.ReverseProxy(ctx, h.cacheHandler)
 		} else {
 			ctx.String(200, "PONG")
 		}
