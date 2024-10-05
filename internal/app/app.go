@@ -34,6 +34,12 @@ func (a *App) execute() {
 
 	server.SetHandler(router.GetHandler())
 	server.Start()
+
+	err := <-server.Notify()
+	if err != nil {
+		logger.Logger(err).Error()
+		a.notify <- os.Kill
+	}
 }
 
 func (a *App) Start() {
