@@ -21,16 +21,16 @@ func (i item[V]) isExpired() bool {
 
 // TTLCache is a generic cache implementation with support for time-to-live
 // (TTL) expiration.
-type TTLCache[K comparable, V any] struct {
-	items map[K]item[V] // The map storing cache items.
-	mu    sync.Mutex    // Mutex for controlling concurrent access to the cache.
+type TTLCache[K comparable] struct {
+	items map[K]item[[]byte] // The map storing cache items.
+	mu    sync.Mutex         // Mutex for controlling concurrent access to the cache.
 }
 
 // NewTTL creates a new TTLCache instance and starts a goroutine to periodically
 // remove expired items every 5 seconds.
-func NewCache[K comparable, V any]() *TTLCache[K, V] {
-	c := &TTLCache[K, V]{
-		items: make(map[K]item[V]),
+func NewCache[K comparable]() *TTLCache[K] {
+	c := &TTLCache[K]{
+		items: make(map[K]item[[]byte]),
 	}
 
 	go func() {
@@ -53,18 +53,18 @@ func NewCache[K comparable, V any]() *TTLCache[K, V] {
 
 // Set adds a new item to the cache with the specified key, value, and
 // time-to-live (TTL).
-func (c *TTLCache[K, V]) Set(key K, value V, ttl time.Duration) {
+func (c *TTLCache[K]) Set(key K, value []byte, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.items[key] = item[V]{
+	c.items[key] = item[[]byte]{
 		value:  value,
 		expiry: time.Now().Add(ttl),
 	}
 }
 
 // Get retrieves the value associated with the given key from the cache.
-func (c *TTLCache[K, V]) Get(key K) (V, bool) {
+func (c *TTLCache[K]) Get(key K) ([]byte, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -86,7 +86,7 @@ func (c *TTLCache[K, V]) Get(key K) (V, bool) {
 }
 
 // Remove removes the item with the specified key from the cache.
-func (c *TTLCache[K, V]) Remove(key K) {
+func (c *TTLCache[K]) Remove(key K) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -95,7 +95,7 @@ func (c *TTLCache[K, V]) Remove(key K) {
 }
 
 // Pop removes and returns the item with the specified key from the cache.
-func (c *TTLCache[K, V]) Pop(key K) (V, bool) {
+func (c *TTLCache[K]) Pop(key K) ([]byte, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -118,7 +118,7 @@ func (c *TTLCache[K, V]) Pop(key K) (V, bool) {
 }
 
 // GetTTL returns the remaining time before the specified key expires.
-func (c *TTLCache[K, V]) GetTTL(key K) (time.Duration, bool) {
+func (c *TTLCache[K]) GetTTL(key K) (time.Duration, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

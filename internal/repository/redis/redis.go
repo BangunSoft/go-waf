@@ -24,7 +24,7 @@ func NewCache(ctx context.Context, redisClient *redis.Client) *TTLCache {
 }
 
 // Set adds a new item to the Redis cache with the specified key, value, and TTL.
-func (c *TTLCache) Set(key string, value interface{}, ttl time.Duration) {
+func (c *TTLCache) Set(key string, value []byte, ttl time.Duration) {
 	serializedValue, err := json.Marshal(value)
 	if err != nil {
 		logger.Logger("Error serializing value: ", err).Error()
@@ -38,7 +38,7 @@ func (c *TTLCache) Set(key string, value interface{}, ttl time.Duration) {
 }
 
 // Get retrieves the value associated with the given key from the Redis cache.
-func (c *TTLCache) Get(key string) (interface{}, bool) {
+func (c *TTLCache) Get(key string) ([]byte, bool) {
 	serializedValue, err := c.client.Get(c.ctx, key).Result()
 	if err == redis.Nil {
 		// Key does not exist
@@ -49,7 +49,7 @@ func (c *TTLCache) Get(key string) (interface{}, bool) {
 		return nil, false
 	}
 
-	var value interface{}
+	var value []byte
 	err = json.Unmarshal([]byte(serializedValue), &value)
 	if err != nil {
 		logger.Logger("Error deserializing value: ", err).Error()
@@ -60,7 +60,7 @@ func (c *TTLCache) Get(key string) (interface{}, bool) {
 }
 
 // Pop removes and returns the item with the specified key from the Redis cache.
-func (c *TTLCache) Pop(key string) (interface{}, bool) {
+func (c *TTLCache) Pop(key string) ([]byte, bool) {
 	serializedValue, err := c.client.GetDel(c.ctx, key).Result()
 	if err == redis.Nil {
 		// Key does not exist
@@ -71,7 +71,7 @@ func (c *TTLCache) Pop(key string) (interface{}, bool) {
 		return nil, false
 	}
 
-	var value interface{}
+	var value []byte
 	err = json.Unmarshal([]byte(serializedValue), &value)
 	if err != nil {
 		logger.Logger("Error deserializing value: ", err).Error()

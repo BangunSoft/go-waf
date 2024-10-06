@@ -3,9 +3,9 @@ package repository
 import "time"
 
 type CacheInterface interface {
-	Set(string, interface{}, time.Duration)
-	Get(string) (interface{}, bool)
-	Pop(string) (interface{}, bool)
+	Set(string, []byte, time.Duration)
+	Get(string) ([]byte, bool)
+	Pop(string) ([]byte, bool)
 	Remove(string)
 	GetTTL(string) (time.Duration, bool)
 }

@@ -17,8 +17,8 @@ type FileCache struct {
 
 // CacheItem represents an item stored in the cache, along with its expiration time.
 type CacheItem struct {
-	Value      interface{} `json:"value"`
-	Expiration int64       `json:"expiration"` // Unix timestamp
+	Value      []byte `json:"value"`
+	Expiration int64  `json:"expiration"` // Unix timestamp
 }
 
 // NewFileCache creates a new FileCache instance with the specified directory.
@@ -27,7 +27,7 @@ func NewFileCache(cacheDir string) *FileCache {
 }
 
 // Set adds a new item to the file cache with the specified key, value, and TTL.
-func (c *FileCache) Set(key string, value interface{}, ttl time.Duration) {
+func (c *FileCache) Set(key string, value []byte, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -51,7 +51,7 @@ func (c *FileCache) Set(key string, value interface{}, ttl time.Duration) {
 }
 
 // Get retrieves the value associated with the given key from the file cache.
-func (c *FileCache) Get(key string) (interface{}, bool) {
+func (c *FileCache) Get(key string) ([]byte, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -82,7 +82,7 @@ func (c *FileCache) Get(key string) (interface{}, bool) {
 }
 
 // Pop removes and returns the item with the specified key from the file cache.
-func (c *FileCache) Pop(key string) (interface{}, bool) {
+func (c *FileCache) Pop(key string) ([]byte, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

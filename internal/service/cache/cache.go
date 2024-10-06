@@ -36,10 +36,10 @@ func NewCacheService(config *config.Config) *CacheService {
 		cachePath := "cache/"
 		_, err := os.Stat(cachePath)
 		if err != nil {
-			logger.Logger("Cache path does'nt exists. Create cache path...").Info()
+			logger.Logger("[debug] Cache path does'nt exists. Create cache path...").Debug()
 			err = os.MkdirAll(cachePath, 0755)
 			if err != nil {
-				logger.Logger("Create cache path error.", err).Fatal()
+				logger.Logger("[Fatal] Create cache path error.", err).Fatal()
 			}
 		}
 
@@ -50,7 +50,7 @@ func NewCacheService(config *config.Config) *CacheService {
 
 		driver = file_cache.NewFileCache(cachePath)
 	default:
-		driver = memory_cache.NewCache[string, interface{}]()
+		driver = memory_cache.NewCache[string]()
 	}
 
 	return &CacheService{
@@ -64,15 +64,15 @@ func (s *CacheService) generateKey(key string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-func (s *CacheService) Set(key string, value interface{}, duration time.Duration) {
+func (s *CacheService) Set(key string, value []byte, duration time.Duration) {
 	s.driver.Set(s.generateKey(key), value, duration)
 }
 
-func (s *CacheService) Get(key string) (interface{}, bool) {
+func (s *CacheService) Get(key string) ([]byte, bool) {
 	return s.driver.Get(s.generateKey(key))
 }
 
-func (s *CacheService) Pop(key string) (interface{}, bool) {
+func (s *CacheService) Pop(key string) ([]byte, bool) {
 	return s.driver.Pop(s.generateKey(key))
 }
 

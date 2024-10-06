@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"go-waf/config"
 	"go-waf/internal/interface/service"
@@ -58,23 +59,30 @@ func (h *Handler) UseCache(c *gin.Context) {
 		return
 	}
 
-	// var data CacheHandler
-	data, ok := getCache.(map[string]interface{})
-	if !ok {
-		logger.Logger("[warn] cache is not a map[string]interface{}. This is: ", reflect.TypeOf(getCache)).Warn()
-		h.cacheDriver.Remove(url)
-		h.FetchData(c)
-		return
-	}
-
 	var cacheData CacheHandler
-	cacheHeaders, _ := data["headers"].(map[string]interface{})
-	cacheData.CacheData, _ = base64.StdEncoding.DecodeString(data["data"].(string))
+	err := json.Unmarshal(getCache, &cacheData)
+	if err != nil {
+		logger.Logger("[debug] cannot cast cache data to CacheHandler, cache data type is ", reflect.TypeOf(getCache), ". Trying with map[string]interface{}").Debug()
+		cacheData = CacheHandler{}
+		var data map[string]interface{}
+		json.Unmarshal(getCache, &data)
+		cacheHeaders, _ := data["headers"].(map[string]interface{})
+		cacheData.CacheData, _ = base64.StdEncoding.DecodeString(data["data"].(string))
 
-	for key, headers := range cacheHeaders {
-		header := headers.([]interface{})
-		if len(header) > 0 {
-			c.Header(key, header[0].(string))
+		// set header
+		for key, headers := range cacheHeaders {
+			header := headers.([]interface{})
+			if len(header) > 0 {
+				c.Header(key, header[0].(string))
+			}
+		}
+	} else {
+		logger.Logger("[debug] cast cache data to CacheHandler").Debug()
+		// set header
+		for key, headers := range cacheData.CacheHeaders {
+			if len(headers) > 0 {
+				c.Header(key, headers[0])
+			}
 		}
 	}
 
@@ -141,8 +149,9 @@ func (h *Handler) FetchData(c *gin.Context) {
 				CacheHeaders: r.Header,
 				CacheData:    body,
 			}
+			data, _ := json.Marshal(cacheData)
 			logger.Logger("[debug] Set new cache", r.Request.URL.String()).Debug()
-			h.cacheDriver.Set(r.Request.URL.String(), cacheData, time.Duration(h.config.CACHE_TTL)*time.Second)
+			h.cacheDriver.Set(r.Request.URL.String(), data, time.Duration(h.config.CACHE_TTL)*time.Second)
 			r.Header.Set("X-Cache", "MISS")
 		}
 
