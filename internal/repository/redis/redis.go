@@ -89,6 +89,22 @@ func (c *TTLCache) Remove(key string) {
 	}
 }
 
+func (s *TTLCache) RemoveByPrefix(prefix string) {
+	// Use Redis KEYS command to find all keys with the specified prefix
+	keys, err := s.client.Keys(context.Background(), prefix+"*").Result()
+	if err != nil {
+		logger.Logger("[warn] Error retrieving keys from Redis: ", err).Warn()
+		return
+	}
+	// Delete all matching keys
+	if len(keys) > 0 {
+		_, err = s.client.Del(context.Background(), keys...).Result()
+		if err != nil {
+			logger.Logger("[warn] Error deleting keys from Redis: ", err).Warn()
+		}
+	}
+}
+
 // GetTTL returns the remaining time before the specified key expires.
 func (c *TTLCache) GetTTL(key string) (time.Duration, bool) {
 	ttl, err := c.client.TTL(c.ctx, key).Result()

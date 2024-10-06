@@ -128,6 +128,32 @@ func (c *FileCache) Remove(key string) {
 	}
 }
 
+func (c *FileCache) RemoveByPrefix(prefix string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// For file cache, you need to implement logic to iterate through the files
+	// Assuming the file cache uses a specific directory to store cache files
+	files, err := os.ReadDir(c.cacheDir)
+	if err != nil {
+		logger.Logger("[warn] Error reading cache directory: ", err).Warn()
+		return
+	}
+
+	prefixN := len(prefix)
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		if len(file.Name()) >= prefixN && file.Name()[:prefixN] == prefix {
+			err = os.Remove(c.cacheDir + file.Name())
+			if err != nil {
+				logger.Logger("[warn] Error deleting cache file: ", err).Warn()
+			}
+		}
+	}
+}
+
 // GetTTL returns the remaining time before the specified key expires.
 func (c *FileCache) GetTTL(key string) (time.Duration, bool) {
 	c.mu.RLock()

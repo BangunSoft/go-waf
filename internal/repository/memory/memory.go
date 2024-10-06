@@ -21,16 +21,16 @@ func (i item[V]) isExpired() bool {
 
 // TTLCache is a generic cache implementation with support for time-to-live
 // (TTL) expiration.
-type TTLCache[K comparable] struct {
-	items map[K]item[[]byte] // The map storing cache items.
-	mu    sync.Mutex         // Mutex for controlling concurrent access to the cache.
+type TTLCache struct {
+	items map[string]item[[]byte] // The map storing cache items.
+	mu    sync.Mutex              // Mutex for controlling concurrent access to the cache.
 }
 
 // NewTTL creates a new TTLCache instance and starts a goroutine to periodically
 // remove expired items every 5 seconds.
-func NewCache[K comparable]() *TTLCache[K] {
-	c := &TTLCache[K]{
-		items: make(map[K]item[[]byte]),
+func NewCache() *TTLCache {
+	c := &TTLCache{
+		items: make(map[string]item[[]byte]),
 	}
 
 	go func() {
@@ -53,7 +53,7 @@ func NewCache[K comparable]() *TTLCache[K] {
 
 // Set adds a new item to the cache with the specified key, value, and
 // time-to-live (TTL).
-func (c *TTLCache[K]) Set(key K, value []byte, ttl time.Duration) {
+func (c *TTLCache) Set(key string, value []byte, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -64,7 +64,7 @@ func (c *TTLCache[K]) Set(key K, value []byte, ttl time.Duration) {
 }
 
 // Get retrieves the value associated with the given key from the cache.
-func (c *TTLCache[K]) Get(key K) ([]byte, bool) {
+func (c *TTLCache) Get(key string) ([]byte, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -86,7 +86,7 @@ func (c *TTLCache[K]) Get(key K) ([]byte, bool) {
 }
 
 // Remove removes the item with the specified key from the cache.
-func (c *TTLCache[K]) Remove(key K) {
+func (c *TTLCache) Remove(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -94,8 +94,22 @@ func (c *TTLCache[K]) Remove(key K) {
 	delete(c.items, key)
 }
 
+func (c *TTLCache) RemoveByPrefix(prefix string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	prefixN := len(prefix)
+	for key := range c.items {
+		// matching key with prefix
+		if len(key) >= prefixN && key[:prefixN] == prefix {
+			// Delete the item with the given prefix from the cache.
+			delete(c.items, key)
+		}
+	}
+}
+
 // Pop removes and returns the item with the specified key from the cache.
-func (c *TTLCache[K]) Pop(key K) ([]byte, bool) {
+func (c *TTLCache) Pop(key string) ([]byte, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -118,7 +132,7 @@ func (c *TTLCache[K]) Pop(key K) ([]byte, bool) {
 }
 
 // GetTTL returns the remaining time before the specified key expires.
-func (c *TTLCache[K]) GetTTL(key K) (time.Duration, bool) {
+func (c *TTLCache) GetTTL(key string) (time.Duration, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

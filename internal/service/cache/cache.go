@@ -2,8 +2,6 @@ package service_cache
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"go-waf/config"
 	"go-waf/internal/interface/repository"
 	file_cache "go-waf/internal/repository/file"
@@ -11,6 +9,7 @@ import (
 	redis_cache "go-waf/internal/repository/redis"
 	"go-waf/pkg/logger"
 	"os"
+	"regexp"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -50,7 +49,7 @@ func NewCacheService(config *config.Config) *CacheService {
 
 		driver = file_cache.NewFileCache(cachePath)
 	default:
-		driver = memory_cache.NewCache[string]()
+		driver = memory_cache.NewCache()
 	}
 
 	return &CacheService{
@@ -60,26 +59,38 @@ func NewCacheService(config *config.Config) *CacheService {
 }
 
 func (s *CacheService) generateKey(key string) string {
-	hash := md5.Sum([]byte(key))
-	return hex.EncodeToString(hash[:])
+	// Define a regex that matches illegal characters
+	re := regexp.MustCompile(`[\/\\\?\*\:\<\>\|\"\s\&]`)
+	// Replace illegal characters with an underscore
+	return re.ReplaceAllString(key, "_")
 }
 
 func (s *CacheService) Set(key string, value []byte, duration time.Duration) {
-	s.driver.Set(s.generateKey(key), value, duration)
+	generatedKey := s.generateKey(key)
+	s.driver.Set(generatedKey, value, duration)
 }
 
 func (s *CacheService) Get(key string) ([]byte, bool) {
-	return s.driver.Get(s.generateKey(key))
+	generatedKey := s.generateKey(key)
+	return s.driver.Get(generatedKey)
 }
 
 func (s *CacheService) Pop(key string) ([]byte, bool) {
-	return s.driver.Pop(s.generateKey(key))
+	generatedKey := s.generateKey(key)
+	return s.driver.Pop(generatedKey)
 }
 
 func (s *CacheService) Remove(key string) {
-	s.driver.Remove(s.generateKey(key))
+	generatedKey := s.generateKey(key)
+	s.driver.Remove(generatedKey)
+}
+
+func (s *CacheService) RemoveByPrefix(prefix string) {
+	generatedKey := s.generateKey(prefix)
+	s.driver.RemoveByPrefix(generatedKey)
 }
 
 func (s *CacheService) GetTTL(key string) (time.Duration, bool) {
-	return s.driver.GetTTL(s.generateKey(key))
+	generatedKey := s.generateKey(key)
+	return s.driver.GetTTL(generatedKey)
 }
