@@ -50,7 +50,6 @@ func (h *Router) setRouter() {
 
 	// set handler
 	h.handler.Any("/*path", func(ctx *gin.Context) {
-		logger.Logger("[info] clear cache: ", ctx.Request.Method).Info()
 		if ctx.Param("path") == "/ping" {
 			ctx.String(200, "PONG")
 		} else if h.config.USE_CACHE &&
