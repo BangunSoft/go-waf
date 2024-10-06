@@ -31,7 +31,8 @@ func NewHttpRouter(config *config.Config, cacheHandler service.CacheInterface) *
 }
 
 func (h *Router) setRouter() {
-	h.handler.HandleMethodNotAllowed = true
+	// this will used for clear cache
+	h.handler.HandleMethodNotAllowed = h.config.USE_CACHE
 
 	// ratelimiter
 	if h.config.USE_RATELIMIT {

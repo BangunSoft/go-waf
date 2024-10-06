@@ -92,6 +92,9 @@ func (h *Handler) UseCache(c *gin.Context) {
 		h.cacheDriver.Remove(url)
 	}
 
+	c.Header("Via", "")
+	c.Header("Server", "")
+	c.Header("X-Varnish", "")
 	c.Header("X-Cache", "HIT")
 	c.Header("X-Age", fmt.Sprintf("%d", ttl))
 	c.Data(200, c.GetHeader("Content-Type"), cacheData.CacheData)
@@ -115,6 +118,7 @@ func (h *Handler) FetchData(c *gin.Context) {
 		req.URL.Scheme = remote.Scheme
 		req.URL.Host = remote.Host
 		req.URL.Path = c.Param("path")
+		req.Header.Del("Accept-Encoding")
 	}
 
 	proxy.ModifyResponse = func(r *http.Response) error {
@@ -125,25 +129,28 @@ func (h *Handler) FetchData(c *gin.Context) {
 			return err
 		}
 
-		hostDestination, err := url.Parse(h.config.HOST_DESTINATION)
-		if err != nil {
-			logger.Logger(err).Warn()
-			return err
+		scheme := c.Request.URL.Scheme
+		if scheme == "" {
+			scheme = "http"
 		}
-
-		body = bytes.ReplaceAll(
+		body = bytes.Replace(
 			body,
 			[]byte(h.config.HOST_DESTINATION),
-			[]byte(fmt.Sprintf("%s://%s", hostDestination.Scheme, h.config.HOST)),
+			[]byte(fmt.Sprintf("%s://%s", scheme, c.Request.Host)),
+			-1,
 		)
 
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		r.ContentLength = int64(len(body))
 		r.Header.Set("Content-Length", strconv.Itoa(len(body)))
+		r.Header.Del("Via")
+		r.Header.Del("Server")
+		r.Header.Del("X-Varnish")
 
 		if h.config.USE_CACHE && r.StatusCode == 200 &&
 			(c.Request.Method == "GET" || c.Request.Method == "HEAD") &&
-			!strings.Contains(r.Header.Get("Cache-Control"), "max-age=0") {
+			!strings.Contains(r.Header.Get("Cache-Control"), "max-age=0") &&
+			!strings.Contains(r.Header.Get("Cache-Control"), "no-cache") {
 			cacheData := &CacheHandler{
 				CacheURL:     r.Request.URL.String(),
 				CacheHeaders: r.Header,
