@@ -2,9 +2,12 @@ package delivery_http
 
 import (
 	"go-waf/config"
+	http_clearcache_handler "go-waf/internal/delivery/http/clear_cache"
 	http_reverseproxy_handler "go-waf/internal/delivery/http/reverse_proxy"
 	"go-waf/internal/interface/service"
 	"go-waf/internal/middleware/ratelimit"
+	"go-waf/pkg/logger"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,6 +31,8 @@ func NewHttpRouter(config *config.Config, cacheHandler service.CacheInterface) *
 }
 
 func (h *Router) setRouter() {
+	h.handler.HandleMethodNotAllowed = true
+
 	// ratelimiter
 	if h.config.USE_RATELIMIT {
 		// TODO: add redis as driver option
@@ -41,13 +46,29 @@ func (h *Router) setRouter() {
 
 	// initial handler
 	proxyHandler := http_reverseproxy_handler.NewHttpHandler(h.config, h.handler, h.cacheHandler)
+	clearCacheHandler := http_clearcache_handler.NewHttpHandler(h.config, h.handler, h.cacheHandler)
 
 	// set handler
 	h.handler.Any("/*path", func(ctx *gin.Context) {
-		if ctx.Param("path") != "/ping" {
-			proxyHandler.ReverseProxy(ctx, h.cacheHandler)
-		} else {
+		logger.Logger("[info] clear cache: ", ctx.Request.Method).Info()
+		if ctx.Param("path") == "/ping" {
 			ctx.String(200, "PONG")
+		} else if h.config.USE_CACHE &&
+			strings.EqualFold(ctx.Request.Method, h.config.CACHE_REMOVE_METHOD) {
+			logger.Logger("[info] clear cache: ", ctx.Param("path")).Info()
+			clearCacheHandler.Clear(ctx)
+		} else {
+			proxyHandler.ReverseProxy(ctx)
+		}
+	})
+
+	h.handler.NoMethod(func(ctx *gin.Context) {
+		if h.config.USE_CACHE &&
+			strings.EqualFold(ctx.Request.Method, h.config.CACHE_REMOVE_METHOD) {
+			logger.Logger("[info] clear cache: ", ctx.Param("path")).Info()
+			clearCacheHandler.Clear(ctx)
+		} else {
+			ctx.String(404, "404 page not found")
 		}
 	})
 }

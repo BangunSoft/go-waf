@@ -40,7 +40,7 @@ func NewHttpHandler(config *config.Config, handler *gin.Engine, cacheDriver serv
 	}
 }
 
-func (h *Handler) ReverseProxy(c *gin.Context, cacheHandler service.CacheInterface) {
+func (h *Handler) ReverseProxy(c *gin.Context) {
 	if h.config.USE_CACHE &&
 		(c.Request.Method == "GET" || c.Request.Method == "HEAD") {
 		h.UseCache(c)
