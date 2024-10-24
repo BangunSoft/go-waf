@@ -1,9 +1,10 @@
 package memory_cache
 
 import (
-	"go-waf/internal/interface/service"
 	"sync"
 	"time"
+
+	"github.com/jahrulnr/go-waf/internal/interface/service"
 )
 
 // reference

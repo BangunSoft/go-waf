@@ -3,12 +3,13 @@ package file_cache
 import (
 	"encoding/json"
 	"fmt"
-	"go-waf/internal/interface/service"
-	"go-waf/pkg/logger"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/jahrulnr/go-waf/internal/interface/service"
+	"github.com/jahrulnr/go-waf/pkg/logger"
 )
 
 type FileCache struct {

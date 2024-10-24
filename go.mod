@@ -1,4 +1,4 @@
-module go-waf
+module github.com/jahrulnr/go-waf
 
 go 1.23.1
 

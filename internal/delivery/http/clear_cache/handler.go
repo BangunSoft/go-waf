@@ -1,12 +1,13 @@
 package http_clearcache_handler
 
 import (
-	"go-waf/config"
-	"go-waf/internal/interface/service"
-	service_allow_ip "go-waf/internal/service/allow_ip"
-	"go-waf/pkg/logger"
 	"net/url"
 	"strings"
+
+	"github.com/jahrulnr/go-waf/config"
+	"github.com/jahrulnr/go-waf/internal/interface/service"
+	service_allow_ip "github.com/jahrulnr/go-waf/internal/service/allow_ip"
+	"github.com/jahrulnr/go-waf/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 )

@@ -1,10 +1,11 @@
 package service_allow_ip
 
 import (
-	"go-waf/config"
-	"go-waf/internal/interface/service"
 	"net/netip"
 	"strings"
+
+	"github.com/jahrulnr/go-waf/config"
+	"github.com/jahrulnr/go-waf/internal/interface/service"
 )
 
 type AllowIP struct {

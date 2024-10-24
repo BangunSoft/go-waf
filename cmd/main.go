@@ -1,12 +1,13 @@
 package main
 
 import (
-	"go-waf/config"
-	"go-waf/internal/app"
-	"go-waf/pkg/logger"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/jahrulnr/go-waf/config"
+	"github.com/jahrulnr/go-waf/internal/app"
+	"github.com/jahrulnr/go-waf/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 )

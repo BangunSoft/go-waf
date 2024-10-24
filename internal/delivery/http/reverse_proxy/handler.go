@@ -6,9 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"go-waf/config"
-	"go-waf/internal/interface/service"
-	"go-waf/pkg/logger"
 	"io"
 	"net/http"
 	"net/http/httputil"
@@ -17,6 +14,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jahrulnr/go-waf/config"
+	"github.com/jahrulnr/go-waf/internal/interface/service"
+	"github.com/jahrulnr/go-waf/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 )

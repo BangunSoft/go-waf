@@ -1,8 +1,9 @@
 package httpserver
 
 import (
-	"go-waf/config"
 	"net/http"
+
+	"github.com/jahrulnr/go-waf/config"
 
 	"github.com/gin-gonic/gin"
 )

@@ -2,13 +2,14 @@ package app
 
 import (
 	"fmt"
-	"go-waf/config"
-	delivery_http "go-waf/internal/delivery/http"
-	service_cache "go-waf/internal/service/cache"
-	"go-waf/pkg/httpserver"
-	"go-waf/pkg/logger"
 	"os"
 	"time"
+
+	"github.com/jahrulnr/go-waf/config"
+	delivery_http "github.com/jahrulnr/go-waf/internal/delivery/http"
+	service_cache "github.com/jahrulnr/go-waf/internal/service/cache"
+	"github.com/jahrulnr/go-waf/pkg/httpserver"
+	"github.com/jahrulnr/go-waf/pkg/logger"
 )
 
 type App struct {

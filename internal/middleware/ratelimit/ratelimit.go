@@ -2,13 +2,14 @@ package ratelimit
 
 import (
 	"fmt"
-	"go-waf/config"
-	"go-waf/pkg/logger"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/jahrulnr/go-waf/config"
+	"github.com/jahrulnr/go-waf/pkg/logger"
 
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/gin"

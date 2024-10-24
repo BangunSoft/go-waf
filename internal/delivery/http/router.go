@@ -1,13 +1,14 @@
 package delivery_http
 
 import (
-	"go-waf/config"
-	http_clearcache_handler "go-waf/internal/delivery/http/clear_cache"
-	http_reverseproxy_handler "go-waf/internal/delivery/http/reverse_proxy"
-	"go-waf/internal/interface/service"
-	"go-waf/internal/middleware/ratelimit"
-	"go-waf/pkg/logger"
 	"strings"
+
+	"github.com/jahrulnr/go-waf/config"
+	http_clearcache_handler "github.com/jahrulnr/go-waf/internal/delivery/http/clear_cache"
+	http_reverseproxy_handler "github.com/jahrulnr/go-waf/internal/delivery/http/reverse_proxy"
+	"github.com/jahrulnr/go-waf/internal/interface/service"
+	"github.com/jahrulnr/go-waf/internal/middleware/ratelimit"
+	"github.com/jahrulnr/go-waf/pkg/logger"
 
 	"github.com/gin-gonic/gin"
 )

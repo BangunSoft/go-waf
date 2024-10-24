@@ -3,9 +3,10 @@ package redis_cache
 import (
 	"context"
 	"encoding/json"
-	"go-waf/internal/interface/service"
-	"go-waf/pkg/logger"
 	"time"
+
+	"github.com/jahrulnr/go-waf/internal/interface/service"
+	"github.com/jahrulnr/go-waf/pkg/logger"
 
 	"github.com/redis/go-redis/v9"
 )
