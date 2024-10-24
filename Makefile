@@ -6,4 +6,4 @@ build:
 	go build -o go-waf cmd/main.go
 
 dockerize:
-	docker build . -t go-waf
+	docker build . -t go-waf --network=host
