@@ -66,7 +66,11 @@ func (h *Handler) UseCache(c *gin.Context) {
 		logger.Logger("[debug] cannot cast cache data to CacheHandler, cache data type is ", reflect.TypeOf(getCache), ". Trying with map[string]interface{}").Debug()
 		cacheData = CacheHandler{}
 		var data map[string]interface{}
-		json.Unmarshal(getCache, &data)
+		err = json.Unmarshal(getCache, &data)
+		if err != nil {
+			logger.Logger("[debug] I can't explain this error. err: ", err).Warn()
+		}
+
 		cacheHeaders, _ := data["headers"].(map[string]interface{})
 		cacheData.CacheData, _ = base64.StdEncoding.DecodeString(data["data"].(string))
 
