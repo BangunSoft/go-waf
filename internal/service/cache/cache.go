@@ -2,6 +2,8 @@ package service_cache
 
 import (
 	"context"
+	"crypto/md5"
+	"fmt"
 	"go-waf/config"
 	"go-waf/internal/interface/repository"
 	service "go-waf/internal/interface/service"
@@ -63,7 +65,14 @@ func (s *CacheService) generateKey(key string) string {
 	// Define a regex that matches illegal characters
 	re := regexp.MustCompile(`[\/\\\?\*\:\<\>\|\"\s\&]`)
 	// Replace illegal characters with an underscore
-	return re.ReplaceAllString(key, "_")
+	newKey := re.ReplaceAllString(key, "_")
+
+	// linux limiting file name. So, we make it short.
+	if len(newKey) > 100 {
+		newKey = newKey[:100] + "---md5hash---" + fmt.Sprintf("%x", md5.Sum([]byte(key[100:])))
+	}
+
+	return newKey
 }
 
 func (s *CacheService) Set(key string, value []byte, duration time.Duration) {
