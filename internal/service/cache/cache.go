@@ -4,6 +4,7 @@ import (
 	"context"
 	"go-waf/config"
 	"go-waf/internal/interface/repository"
+	service "go-waf/internal/interface/service"
 	file_cache "go-waf/internal/repository/file"
 	memory_cache "go-waf/internal/repository/memory"
 	redis_cache "go-waf/internal/repository/redis"
@@ -20,7 +21,7 @@ type CacheService struct {
 	driver repository.CacheInterface
 }
 
-func NewCacheService(config *config.Config) *CacheService {
+func NewCacheService(config *config.Config) service.CacheInterface {
 	var driver repository.CacheInterface
 	switch config.CACHE_DRIVER {
 	case "redis":

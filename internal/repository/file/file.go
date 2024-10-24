@@ -3,6 +3,7 @@ package file_cache
 import (
 	"encoding/json"
 	"fmt"
+	"go-waf/internal/interface/service"
 	"go-waf/pkg/logger"
 	"os"
 	"path/filepath"
@@ -22,7 +23,7 @@ type CacheItem struct {
 }
 
 // NewFileCache creates a new FileCache instance with the specified directory.
-func NewFileCache(cacheDir string) *FileCache {
+func NewFileCache(cacheDir string) service.CacheInterface {
 	return &FileCache{cacheDir: cacheDir}
 }
 

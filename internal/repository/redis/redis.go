@@ -3,6 +3,7 @@ package redis_cache
 import (
 	"context"
 	"encoding/json"
+	"go-waf/internal/interface/service"
 	"go-waf/pkg/logger"
 	"time"
 
@@ -16,7 +17,7 @@ type TTLCache struct {
 }
 
 // NewCache creates a new TTLCache instance connected to a Redis server.
-func NewCache(ctx context.Context, redisClient *redis.Client) *TTLCache {
+func NewCache(ctx context.Context, redisClient *redis.Client) service.CacheInterface {
 	return &TTLCache{
 		client: redisClient,
 		ctx:    ctx,

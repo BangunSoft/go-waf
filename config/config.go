@@ -22,10 +22,11 @@ type Config struct {
 	RATELIMIT_SECOND int  `env:"RATELIMIT_SECOND" env-default:"1"`
 	RATELIMIT_MAX    uint `env:"RATELIMIT_MAX" env-default:"5"`
 
-	USE_CACHE           bool   `env:"USE_CACHE" env-default:"false"`
-	CACHE_TTL           int    `env:"CACHE_TTL" env-default:"1209600"` // default 2 week
-	CACHE_DRIVER        string `env:"CACHE_DRIVER" env-default:"memory"`
-	CACHE_REMOVE_METHOD string `env:"CACHE_REMOVE_METHOD" env-default:"ban"` // example: curl -X BAN http://localhost:8080/blogs/?is_prefix=true
+	USE_CACHE             bool   `env:"USE_CACHE" env-default:"false"`
+	CACHE_TTL             int    `env:"CACHE_TTL" env-default:"1209600"` // default 2 week
+	CACHE_DRIVER          string `env:"CACHE_DRIVER" env-default:"memory"`
+	CACHE_REMOVE_METHOD   string `env:"CACHE_REMOVE_METHOD" env-default:"ban"` // example: curl -X BAN http://localhost:8080/blogs/?is_prefix=true
+	CACHE_REMOVE_ALLOW_IP string `env:"CACHE_REMOVE_ALLOW_IP" env-default:"127.0.0.0/24"`
 
 	REDIS_ADDR string `env:"REDIS_ADDR" env-default:"localhost:6379"`
 	REDIS_SSL  bool   `env:"REDIS_SSL" env-default:"false"`

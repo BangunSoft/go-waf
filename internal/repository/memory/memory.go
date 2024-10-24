@@ -1,6 +1,7 @@
 package memory_cache
 
 import (
+	"go-waf/internal/interface/service"
 	"sync"
 	"time"
 )
@@ -28,7 +29,7 @@ type TTLCache struct {
 
 // NewTTL creates a new TTLCache instance and starts a goroutine to periodically
 // remove expired items every 5 seconds.
-func NewCache() *TTLCache {
+func NewCache() service.CacheInterface {
 	c := &TTLCache{
 		items: make(map[string]item[[]byte]),
 	}
