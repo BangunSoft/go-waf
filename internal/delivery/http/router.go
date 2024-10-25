@@ -3,6 +3,7 @@ package delivery_http
 import (
 	"strings"
 
+	"github.com/gin-contrib/gzip"
 	"github.com/jahrulnr/go-waf/config"
 	http_clearcache_handler "github.com/jahrulnr/go-waf/internal/delivery/http/clear_cache"
 	http_reverseproxy_handler "github.com/jahrulnr/go-waf/internal/delivery/http/reverse_proxy"
@@ -32,18 +33,28 @@ func NewHttpRouter(config *config.Config, cacheHandler service.CacheInterface) *
 }
 
 func (h *Router) setRouter() {
+	var middlewareList []gin.HandlerFunc
+
 	// this will used for clear cache
 	h.handler.HandleMethodNotAllowed = h.config.USE_CACHE
 
 	// ratelimiter
 	if h.config.USE_RATELIMIT {
-		// TODO: add redis as driver option
 		if h.config.CACHE_DRIVER == "redis" {
 			h.rateLimiter.Driver("redis")
 		} else {
 			h.rateLimiter.Driver("memory")
 		}
-		h.handler.Use(h.rateLimiter.RateLimit())
+		middlewareList = append(middlewareList, h.rateLimiter.RateLimit())
+	}
+
+	// gzip compress
+	if h.config.ENABLE_GZIP {
+		middlewareList = append(middlewareList, gzip.Gzip(gzip.DefaultCompression))
+	}
+
+	if len(middlewareList) > 0 {
+		h.handler.Use(middlewareList...)
 	}
 
 	// initial handler
