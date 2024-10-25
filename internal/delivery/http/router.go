@@ -3,13 +3,13 @@ package delivery_http
 import (
 	"strings"
 
-	"github.com/gin-contrib/gzip"
 	"github.com/jahrulnr/go-waf/config"
 	http_clearcache_handler "github.com/jahrulnr/go-waf/internal/delivery/http/clear_cache"
 	http_reverseproxy_handler "github.com/jahrulnr/go-waf/internal/delivery/http/reverse_proxy"
 	"github.com/jahrulnr/go-waf/internal/interface/service"
 	"github.com/jahrulnr/go-waf/internal/middleware/ratelimit"
 	"github.com/jahrulnr/go-waf/pkg/logger"
+	"github.com/nanmu42/gzip"
 
 	"github.com/gin-gonic/gin"
 )
@@ -50,7 +50,12 @@ func (h *Router) setRouter() {
 
 	// gzip compress
 	if h.config.ENABLE_GZIP {
-		middlewareList = append(middlewareList, gzip.Gzip(gzip.DefaultCompression))
+		gzipHandler := gzip.NewHandler(gzip.Config{
+			CompressionLevel: h.config.GZIP_COMPRESSION_LEVEL,
+			MinContentLength: h.config.GZIP_MIN_CONTENT_LENGTH,
+		})
+
+		middlewareList = append(middlewareList, gzipHandler.Gin)
 	}
 
 	if len(middlewareList) > 0 {
