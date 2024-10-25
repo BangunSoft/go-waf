@@ -1,0 +1,35 @@
+name: GoWaf Build
+
+env:
+  IMAGE_NAME: go-waf
+
+on: 
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # Set ENV
+      - name: Set dynamic env
+        run: |
+          echo "date_today=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+          echo "repository_name=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')" >> $GITHUB_ENV
+          echo "sha_short=$(git rev-parse --short "$GITHUB_SHA")" >> $GITHUB_ENV
+
+      # Build Docker image and Export
+      - name: Build & export docker image
+        run: |
+          docker build -f Dockerfile --tag ${{ env.IMAGE_NAME }}:${{ env.sha_short }} --platform amd64 --network=host .
+          mkdir -p images
+          docker save ${{ env.IMAGE_NAME }}:${{ env.sha_short }} | gzip > images/${{ env.IMAGE_NAME }}-${{ env.sha_short }}.tar.gz
+
+      # Upload to artifact
+      - name: Upload Image to artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ env.date_today }} - ${{ env.IMAGE_NAME }} - Docker Image AMD64
+          path: images/${{ env.IMAGE_NAME }}-${{ env.sha_short }}.tar.gz
