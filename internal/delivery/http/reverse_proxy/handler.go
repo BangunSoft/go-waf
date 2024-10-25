@@ -149,8 +149,13 @@ func (h *Handler) FetchData(c *gin.Context) {
 		// replace //host to local host
 		body = bytes.ReplaceAll(
 			body,
-			[]byte(fmt.Sprintf("//%s", c.Request.Host)),
-			[]byte(fmt.Sprintf("%s://%s", scheme, c.Request.Host)),
+			[]byte(fmt.Sprintf("\"//%s", c.Request.Host)),
+			[]byte(fmt.Sprintf("\"%s://%s", scheme, c.Request.Host)),
+		)
+		body = bytes.ReplaceAll(
+			body,
+			[]byte(fmt.Sprintf("'//%s", c.Request.Host)),
+			[]byte(fmt.Sprintf("'%s://%s", scheme, c.Request.Host)),
 		)
 
 		r.Body = io.NopCloser(bytes.NewReader(body))
