@@ -31,15 +31,14 @@ func NewHttpHandler(config *config.Config, handler *gin.Engine, cacheDriver serv
 
 func (h *Handler) isAllowed(c *gin.Context) bool {
 	clientIp := c.ClientIP()
-	remoteIp := c.RemoteIP()
 
-	return h.ipService.Check(clientIp) || h.ipService.Check(remoteIp)
+	return h.ipService.Check(clientIp)
 }
 
 func (h *Handler) Clear(c *gin.Context) {
 	fullUrl := h.config.HOST_DESTINATION + c.Request.URL.String()
+	logger.Logger("[warn] IP ", c.ClientIP(), " trying to clear ", fullUrl).Warn()
 	if !h.isAllowed(c) {
-		logger.Logger("[warn] IP ", c.ClientIP(), "|", c.RemoteIP(), " trying to clear ", fullUrl).Warn()
 		c.JSON(400, map[string]interface{}{
 			"status": "Bad Request",
 		})
