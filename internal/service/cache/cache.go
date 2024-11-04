@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"time"
@@ -63,6 +64,11 @@ func NewCacheService(config *config.Config) service.CacheInterface {
 }
 
 func (s *CacheService) generateKey(key string) string {
+	parseUrl, err := url.Parse(key)
+	if err == nil {
+		key = "gowaf-" + parseUrl.Path + "?" + parseUrl.Query().Encode()
+	}
+
 	// Define a regex that matches illegal characters
 	re := regexp.MustCompile(`[\/\\\?\*\:\<\>\|\"\s\&]`)
 	// Replace illegal characters with an underscore

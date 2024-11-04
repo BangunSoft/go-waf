@@ -97,6 +97,13 @@ func (h *Handler) UseCache(c *gin.Context) {
 		h.cacheDriver.Remove(url)
 	}
 
+	// remove duplicate header
+	if h.config.ENABLE_GZIP {
+		c.Header("Accept-Encoding", "")
+		c.Header("Vary", "")
+	}
+
+	// remove some header
 	c.Header("Via", "")
 	c.Header("Server", "")
 	c.Header("X-Varnish", "")
@@ -160,6 +167,14 @@ func (h *Handler) FetchData(c *gin.Context) {
 
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		r.ContentLength = int64(len(body))
+
+		// remove duplicate header
+		if h.config.ENABLE_GZIP {
+			r.Header.Del("Accept-Encoding")
+			r.Header.Del("Vary")
+		}
+
+		// modify header
 		r.Header.Set("Content-Length", strconv.Itoa(len(body)))
 		r.Header.Del("Via")
 		r.Header.Del("Server")

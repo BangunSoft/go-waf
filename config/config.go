@@ -34,7 +34,9 @@ type Config struct {
 	REDIS_PASS string `env:"REDIS_PASS"`
 	REDIS_DB   int    `env:"REDIS_DB" env-default:"0"`
 
-	ENABLE_GZIP bool `env:"ENABLE_GZIP" env-default:"false"`
+	ENABLE_GZIP             bool  `env:"ENABLE_GZIP" env-default:"false"`
+	GZIP_COMPRESSION_LEVEL  int   `env:"GZIP_COMPRESSION_LEVEL" env-default:"6"`
+	GZIP_MIN_CONTENT_LENGTH int64 `env:"GZIP_MIN_CONTENT_LENGTH" env-default:"1024"`
 
 	// debug
 	GIN_MODE  string `env:"GIN_MODE" env-default:"debug"`
