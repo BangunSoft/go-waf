@@ -13,6 +13,7 @@ ENV PATH="$PATH:/app" \
     TZ=Asia/Jakarta
 RUN mkdir -p /app/cache
 COPY --from=builder /app/go-waf /app/go-waf
+COPY views /app/views
 COPY .env-example /app/.env-example
 RUN apk add --no-cache tzdata
 
