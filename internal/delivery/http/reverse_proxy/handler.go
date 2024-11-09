@@ -52,6 +52,10 @@ func (h *Handler) ReverseProxy(c *gin.Context) {
 
 func (h *Handler) UseCache(c *gin.Context) {
 	url := h.config.HOST_DESTINATION + c.Request.URL.String()
+
+	if deviceKey := c.GetHeader("X-Device"); deviceKey != "" && h.config.DETECT_DEVICE && h.config.SPLIT_CACHE_BY_DEVICE {
+		h.cacheDriver.SetKey(deviceKey)
+	}
 	getCache, ok := h.cacheDriver.Get(url)
 
 	if !ok {
@@ -184,6 +188,9 @@ func (h *Handler) FetchData(c *gin.Context) {
 			(c.Request.Method == "GET" || c.Request.Method == "HEAD") &&
 			!strings.Contains(r.Header.Get("Cache-Control"), "max-age=0") &&
 			!strings.Contains(r.Header.Get("Cache-Control"), "no-cache") {
+			if deviceKey := c.GetHeader("X-Device"); deviceKey != "" && h.config.DETECT_DEVICE && h.config.SPLIT_CACHE_BY_DEVICE {
+				h.cacheDriver.SetKey(deviceKey)
+			}
 			cacheData := &CacheHandler{
 				CacheURL:     r.Request.URL.String(),
 				CacheHeaders: r.Header,

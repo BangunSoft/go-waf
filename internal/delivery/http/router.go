@@ -7,6 +7,7 @@ import (
 	http_clearcache_handler "github.com/jahrulnr/go-waf/internal/delivery/http/clear_cache"
 	http_reverseproxy_handler "github.com/jahrulnr/go-waf/internal/delivery/http/reverse_proxy"
 	"github.com/jahrulnr/go-waf/internal/interface/service"
+	"github.com/jahrulnr/go-waf/internal/middleware/device"
 	"github.com/jahrulnr/go-waf/internal/middleware/ratelimit"
 	"github.com/jahrulnr/go-waf/pkg/logger"
 	"github.com/nanmu42/gzip"
@@ -56,6 +57,11 @@ func (h *Router) setRouter() {
 		})
 
 		middlewareList = append(middlewareList, gzipHandler.Gin)
+	}
+
+	if h.config.DETECT_DEVICE {
+		deviceHandler := device.NewCheckDevice(h.config)
+		middlewareList = append(middlewareList, deviceHandler.SendHeader())
 	}
 
 	if len(middlewareList) > 0 {
