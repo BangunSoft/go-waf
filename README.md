@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/5d51b17e-b3ff-4e3a-acb8-a60449d7fc5d" alt="GoWaf icon"/>
+</p>
+
 # go-waf
 
 `go-waf` is a web application firewall (WAF) built using Go and the Gin framework. It provides features such as rate limiting, caching, and reverse proxying to enhance the security and performance of web applications.
