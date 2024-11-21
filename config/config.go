@@ -28,6 +28,9 @@ type Config struct {
 	CACHE_REMOVE_METHOD   string `env:"CACHE_REMOVE_METHOD" env-default:"ban"` // example: curl -X BAN http://localhost:8080/blogs/?is_prefix=true
 	CACHE_REMOVE_ALLOW_IP string `env:"CACHE_REMOVE_ALLOW_IP" env-default:"127.0.0.0/24"`
 
+	DETECT_DEVICE         bool `env:"DETECT_DEVICE" env-default:"true"`
+	SPLIT_CACHE_BY_DEVICE bool `env:"SPLIT_CACHE_BY_DEVICE" env-default:"true"`
+
 	REDIS_ADDR string `env:"REDIS_ADDR" env-default:"localhost:6379"`
 	REDIS_SSL  bool   `env:"REDIS_SSL" env-default:"false"`
 	REDIS_USER string `env:"REDIS_USER"`

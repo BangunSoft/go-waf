@@ -23,6 +23,7 @@ import (
 type CacheService struct {
 	config *config.Config
 	driver repository.CacheInterface
+	key    string
 }
 
 func NewCacheService(config *config.Config) service.CacheInterface {
@@ -60,13 +61,21 @@ func NewCacheService(config *config.Config) service.CacheInterface {
 	return &CacheService{
 		config: config,
 		driver: driver,
+		key:    "gowaf-",
 	}
+}
+
+func (s *CacheService) SetKey(key string) {
+	s.key = "gowaf-" + key + "-"
 }
 
 func (s *CacheService) generateKey(key string) string {
 	parseUrl, err := url.Parse(key)
 	if err == nil {
-		key = "gowaf-" + parseUrl.Path + "?" + parseUrl.Query().Encode()
+		key = s.key + parseUrl.Path
+		if query := parseUrl.Query().Encode(); query != "" {
+			key = key + "?" + query
+		}
 	}
 
 	// Define a regex that matches illegal characters
@@ -79,6 +88,7 @@ func (s *CacheService) generateKey(key string) string {
 		newKey = newKey[:100] + "---md5hash---" + fmt.Sprintf("%x", md5.Sum([]byte(key[100:])))
 	}
 
+	logger.Logger("debug", "generated key: "+newKey).Debug()
 	return newKey
 }
 

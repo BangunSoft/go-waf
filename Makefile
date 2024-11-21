@@ -10,3 +10,6 @@ dockerize:
 
 docker-dev: dockerize
 	docker run -v ./.env:/app/.env -p 8080:8080 --rm go-waf /app/go-waf
+
+save:
+	docker save go-waf | gzip > go-waf.tar.gz

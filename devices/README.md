@@ -1,0 +1,1 @@
+Source: [devicedetector](https://github.com/gamebtc/devicedetector)
