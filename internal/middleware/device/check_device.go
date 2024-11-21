@@ -28,6 +28,12 @@ func (m *Device) SendHeader() gin.HandlerFunc {
 		}
 
 		userAgent := c.Request.Header.Get("User-Agent")
+		if len(userAgent) == 0 {
+			userAgent = "desktop"
+			c.Next()
+			return
+		}
+
 		info := detector.Parse(userAgent)
 		if info.IsMobile() {
 			c.Request.Header.Add("X-Device", "mobile")

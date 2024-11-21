@@ -51,12 +51,25 @@ func (h *Router) setRouter() {
 
 	// gzip compress
 	if h.config.ENABLE_GZIP {
-		gzipHandler := gzip.NewHandler(gzip.Config{
-			CompressionLevel: h.config.GZIP_COMPRESSION_LEVEL,
-			MinContentLength: h.config.GZIP_MIN_CONTENT_LENGTH,
-		})
+		gzipHandler := func(c *gin.Context) {
+			logger.Logger(c.Request.Header.Get("Accept-Encoding")).Debug()
+			if strings.Contains(c.Request.Header.Get("Accept-Encoding"), "gzip") {
+				gzip.NewHandler(gzip.Config{
+					CompressionLevel: h.config.GZIP_COMPRESSION_LEVEL,
+					MinContentLength: h.config.GZIP_MIN_CONTENT_LENGTH,
+					RequestFilter: []gzip.RequestFilter{
+						gzip.NewCommonRequestFilter(),
+						gzip.DefaultExtensionFilter(),
+					},
+					ResponseHeaderFilter: []gzip.ResponseHeaderFilter{
+						gzip.NewSkipCompressedFilter(),
+						gzip.DefaultContentTypeFilter(),
+					},
+				}).Gin(c)
+			}
+		}
 
-		middlewareList = append(middlewareList, gzipHandler.Gin)
+		middlewareList = append(middlewareList, gzipHandler)
 	}
 
 	if h.config.DETECT_DEVICE {
