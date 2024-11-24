@@ -53,7 +53,15 @@ func (h *Handler) Clear(c *gin.Context) {
 	isPrefix := strings.ToLower(c.Query("is_prefix"))
 	if isPrefix == "true" {
 		h.cacheDriver.RemoveByPrefix(fullUrl)
+		h.cacheDriver.SetKey("mobile")
+		h.cacheDriver.RemoveByPrefix(fullUrl)
+		h.cacheDriver.SetKey("desktop")
+		h.cacheDriver.RemoveByPrefix(fullUrl)
 	} else {
+		h.cacheDriver.Remove(fullUrl)
+		h.cacheDriver.SetKey("mobile")
+		h.cacheDriver.Remove(fullUrl)
+		h.cacheDriver.SetKey("desktop")
 		h.cacheDriver.Remove(fullUrl)
 	}
 

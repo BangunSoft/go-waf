@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/jahrulnr/go-waf/internal/interface/service"
+	"github.com/jahrulnr/go-waf/internal/interface/repository"
 	"github.com/jahrulnr/go-waf/pkg/logger"
 )
 
@@ -24,7 +24,7 @@ type CacheItem struct {
 }
 
 // NewFileCache creates a new FileCache instance with the specified directory.
-func NewFileCache(cacheDir string) service.CacheInterface {
+func NewFileCache(cacheDir string) repository.CacheInterface {
 	return &FileCache{cacheDir: cacheDir}
 }
 

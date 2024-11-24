@@ -3,6 +3,7 @@ package service
 import "time"
 
 type CacheInterface interface {
+	SetKey(string)
 	Set(string, []byte, time.Duration)
 	Get(string) ([]byte, bool)
 	Pop(string) ([]byte, bool)

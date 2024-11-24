@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/jahrulnr/go-waf/internal/interface/service"
+	"github.com/jahrulnr/go-waf/internal/interface/repository"
 	"github.com/jahrulnr/go-waf/pkg/logger"
 
 	"github.com/redis/go-redis/v9"
@@ -18,7 +18,7 @@ type TTLCache struct {
 }
 
 // NewCache creates a new TTLCache instance connected to a Redis server.
-func NewCache(ctx context.Context, redisClient *redis.Client) service.CacheInterface {
+func NewCache(ctx context.Context, redisClient *redis.Client) repository.CacheInterface {
 	return &TTLCache{
 		client: redisClient,
 		ctx:    ctx,

@@ -64,7 +64,7 @@ func Logger(logs ...interface{}) *logDriver {
 	_, filename, line, _ := runtime.Caller(1)
 	logger.message = map[string]interface{}{
 		"caller": fmt.Sprintf("%s:%d", filename, line),
-		"log":    fmt.Sprintf("%v", logs),
+		"log":    logs,
 	}
 	logger.jsonize()
 
