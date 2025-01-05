@@ -120,17 +120,15 @@ func (w *WAFService) DetectHeaderThreats(request *service.Request) bool {
 
 func (w *WAFService) DetectBodyThreats(request *service.Request) bool {
 	// Check for SQL injection patterns in headers
-	for _, value := range request.Headers {
-		if injection, _ := libinjection.IsSQLi(value); injection {
-			return true
-		}
+	if injection, _ := libinjection.IsSQLi(string(request.Body)); injection {
+		logger.Logger("Threat Detected (SQL Injection)", string(request.Body)).Warn()
+		return true
 	}
 
 	// Check for XSS patterns in headers
-	for _, value := range request.Headers {
-		if libinjection.IsXSS(value) {
-			return true
-		}
+	if libinjection.IsXSS(string(request.Body)) {
+		logger.Logger("Threat Detected (XSS Attact)", string(request.Body)).Warn()
+		return true
 	}
 
 	// Check for command injection patterns
@@ -143,7 +141,7 @@ func (w *WAFService) DetectBodyThreats(request *service.Request) bool {
 
 	// Check for path traversal patterns
 	for _, pattern := range w.pathTraversalKeywords {
-		if strings.Contains(string(request.Path), pattern) {
+		if strings.Contains(string(request.Body), pattern) {
 			logger.Logger("Threat Detected", pattern).Warn()
 			return true
 		}
