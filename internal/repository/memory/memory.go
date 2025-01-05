@@ -1,89 +1,120 @@
 package memory_cache
 
 import (
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/jahrulnr/go-waf/internal/interface/repository"
+	"github.com/jahrulnr/go-waf/pkg/logger"
 )
 
-// reference
-// https://www.alexedwards.net/blog/implementing-an-in-memory-cache-in-go
-
 // item represents a cache item with a value and an expiration time.
-type item[V any] struct {
-	value  V
+type item struct {
+	value  []byte
 	expiry time.Time
 }
 
 // isExpired checks if the cache item has expired.
-func (i item[V]) isExpired() bool {
+func (i item) isExpired() bool {
 	return time.Now().After(i.expiry)
 }
 
-// TTLCache is a generic cache implementation with support for time-to-live
-// (TTL) expiration.
+// TTLCache is a generic cache implementation with support for time-to-live (TTL) expiration.
 type TTLCache struct {
-	items map[string]item[[]byte] // The map storing cache items.
-	mu    sync.Mutex              // Mutex for controlling concurrent access to the cache.
+	items map[string]item // The map storing cache items.
+	mu    sync.RWMutex    // RWMutex for controlling concurrent access to the cache.
+	limit int             // Maximum size of the cache in bytes.
 }
 
-// NewTTL creates a new TTLCache instance and starts a goroutine to periodically
-// remove expired items every 5 seconds.
+// NewCache creates a new TTLCache instance with a limit set to 80% of available memory.
 func NewCache() repository.CacheInterface {
-	c := &TTLCache{
-		items: make(map[string]item[[]byte]),
+	// Get total memory
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	// Set cache limit to 80% of total memory
+	limit := int(float64(m.Sys) * 0.8) // 80% of total memory
+
+	return &TTLCache{
+		items: make(map[string]item),
+		limit: limit,
 	}
-
-	go func() {
-		for range time.Tick(5 * time.Second) {
-			c.mu.Lock()
-
-			// Iterate over the cache items and delete expired ones.
-			for key, item := range c.items {
-				if item.isExpired() {
-					delete(c.items, key)
-				}
-			}
-
-			c.mu.Unlock()
-		}
-	}()
-
-	return c
 }
 
-// Set adds a new item to the cache with the specified key, value, and
-// time-to-live (TTL).
+// cleanupExpiredItems removes expired items from the cache.
+func (c *TTLCache) cleanupExpiredItems() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for key, item := range c.items {
+		if item.isExpired() {
+			delete(c.items, key)
+			logger.Logger("Removed expired item from cache", key).Debug()
+		}
+	}
+}
+
+// Set adds a new item to the cache with the specified key, value, and time-to-live (TTL).
 func (c *TTLCache) Set(key string, value []byte, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	c.items[key] = item[[]byte]{
+	// Check if the cache has reached its limit
+	if c.limit > 0 && c.currentSize()+len(value) > c.limit {
+		c.evict() // Evict an item if the limit is reached
+	}
+
+	c.items[key] = item{
 		value:  value,
 		expiry: time.Now().Add(ttl),
+	}
+	logger.Logger("Set item in cache", key).Debug()
+}
+
+// currentSize calculates the current size of the cache in bytes.
+func (c *TTLCache) currentSize() int {
+	size := 0
+	for _, item := range c.items {
+		size += len(item.value)
+	}
+	return size
+}
+
+// evict removes the least recently used item from the cache.
+func (c *TTLCache) evict() {
+	var oldestKey string
+	var oldestExpiry time.Time
+
+	for key, item := range c.items {
+		if oldestKey == "" || item.expiry.Before(oldestExpiry) {
+			oldestKey = key
+			oldestExpiry = item.expiry
+		}
+	}
+
+	if oldestKey != "" {
+		delete(c.items, oldestKey)
+		logger.Logger("Evicted item from cache", oldestKey).Debug()
 	}
 }
 
 // Get retrieves the value associated with the given key from the cache.
 func (c *TTLCache) Get(key string) ([]byte, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	item, found := c.items[key]
-	if !found {
-		// If the key is not found, return the zero value for V and false.
-		return item.value, false
+	if !found || item.isExpired() {
+		if found {
+			delete(c.items, key) // Remove expired item
+			logger.Logger("Removed expired item from cache", key).Debug()
+		}
+		return nil, false
 	}
 
-	if item.isExpired() {
-		// If the item has expired, remove it from the cache and return the
-		// value and false.
-		delete(c.items, key)
-		return item.value, false
-	}
+	go c.cleanupExpiredItems()
 
-	// Otherwise return the value and true.
 	return item.value, true
 }
 
@@ -92,20 +123,20 @@ func (c *TTLCache) Remove(key string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Delete the item with the given key from the cache.
 	delete(c.items, key)
+	logger.Logger("Removed item from cache", key).Debug()
 }
 
+// RemoveByPrefix removes all items with the specified prefix from the cache.
 func (c *TTLCache) RemoveByPrefix(prefix string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	prefixN := len(prefix)
 	for key := range c.items {
-		// matching key with prefix
 		if len(key) >= prefixN && key[:prefixN] == prefix {
-			// Delete the item with the given prefix from the cache.
 			delete(c.items, key)
+			logger.Logger("Removed item with prefix from cache", key).Debug()
 		}
 	}
 }
@@ -116,35 +147,30 @@ func (c *TTLCache) Pop(key string) ([]byte, bool) {
 	defer c.mu.Unlock()
 
 	item, found := c.items[key]
-	if !found {
-		// If the key is not found, return the zero value for V and false.
-		return item.value, false
+	if !found || item.isExpired() {
+		if found {
+			delete(c.items, key) // Remove expired item
+			logger.Logger("Removed expired item from cache", key).Debug()
+		}
+		return nil, false
 	}
 
-	// If the key is found, delete the item from the cache.
 	delete(c.items, key)
-
-	if item.isExpired() {
-		// If the item has expired, return the value and false.
-		return item.value, false
-	}
-
-	// Otherwise return the value and true.
+	logger.Logger("Popped item from cache", key).Debug()
 	return item.value, true
 }
 
 // GetTTL returns the remaining time before the specified key expires.
 func (c *TTLCache) GetTTL(key string) (time.Duration, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
 	item, found := c.items[key]
-	if !found {
-		return 0, false // Key does not exist
-	}
-
-	if item.isExpired() {
-		delete(c.items, key) // Optionally remove expired item
+	if !found || item.isExpired() {
+		if found {
+			delete(c.items, key) // Optionally remove expired item
+			logger.Logger("Removed expired item from cache", key).Debug()
+		}
 		return 0, false
 	}
 

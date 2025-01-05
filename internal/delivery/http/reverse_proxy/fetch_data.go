@@ -3,7 +3,6 @@ package http_reverseproxy_handler
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,10 +16,13 @@ import (
 	"github.com/jahrulnr/go-waf/pkg/logger"
 )
 
+// FetchData fetches data from the remote server and caches the response.
 func (h *Handler) FetchData(c *gin.Context) {
 	remote, err := url.Parse(h.config.HOST_DESTINATION)
 	if err != nil {
-		panic(err)
+		logger.Logger("[error] Failed to parse remote URL: ", err).Error()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
 	}
 
 	host := h.config.HOST
@@ -39,67 +41,38 @@ func (h *Handler) FetchData(c *gin.Context) {
 	}
 
 	proxy.ModifyResponse = func(r *http.Response) error {
+		if r.StatusCode != http.StatusOK {
+			return nil // No need to cache non-200 responses
+		}
+
+		var bodyBuffer bytes.Buffer
 		defer r.Body.Close()
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			logger.Logger(err).Warn()
+
+		if _, err := io.Copy(&bodyBuffer, r.Body); err != nil {
+			logger.Logger("[error] Failed to copy response body: ", err).Error()
 			return err
 		}
 
+		body := bodyBuffer.Bytes()
 		scheme := c.Request.URL.Scheme
 		if scheme == "" {
 			scheme = "http"
 		}
 
-		// replace scheme://host to local host
-		body = bytes.ReplaceAll(
-			body,
-			[]byte(h.config.HOST_DESTINATION),
-			[]byte(fmt.Sprintf("%s://%s", scheme, c.Request.Host)),
-		)
-
-		// replace //host to local host
-		body = bytes.ReplaceAll(
-			body,
-			[]byte(fmt.Sprintf("\"//%s", h.config.HOST_DESTINATION)),
-			[]byte(fmt.Sprintf("\"%s://%s", scheme, c.Request.Host)),
-		)
-		body = bytes.ReplaceAll(
-			body,
-			[]byte(fmt.Sprintf("'//%s", h.config.HOST_DESTINATION)),
-			[]byte(fmt.Sprintf("'%s://%s", scheme, c.Request.Host)),
-		)
+		body = bytes.ReplaceAll(body, []byte(h.config.HOST_DESTINATION), []byte(fmt.Sprintf("%s://%s", scheme, c.Request.Host)))
 
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		r.ContentLength = int64(len(body))
+		r.Header.Set("Content-Length", strconv.Itoa(len(body)))
 
-		// remove duplicate header
 		if h.config.ENABLE_GZIP {
 			r.Header.Del("Accept-Encoding")
 			r.Header.Del("Vary")
 		}
 
-		// modify header
-		r.Header.Set("Content-Length", strconv.Itoa(len(body)))
-		r.Header.Del("Via")
-		r.Header.Del("Server")
-		r.Header.Del("X-Varnish")
-
-		if h.config.USE_CACHE && r.StatusCode == 200 &&
-			(c.Request.Method == "GET" || c.Request.Method == "HEAD") &&
-			!strings.Contains(r.Header.Get("Cache-Control"), "max-age=0") &&
-			!strings.Contains(r.Header.Get("Cache-Control"), "no-cache") {
-			if deviceKey := c.GetHeader("X-Device"); deviceKey != "" && h.config.DETECT_DEVICE && h.config.SPLIT_CACHE_BY_DEVICE {
-				h.cacheDriver.SetKey(deviceKey)
-			}
-			cacheData := &CacheHandler{
-				CacheURL:     r.Request.URL.String(),
-				CacheHeaders: r.Header,
-				CacheData:    body,
-			}
-			data, _ := json.Marshal(cacheData)
-			logger.Logger("[debug]", "Set new cache"+r.Request.URL.String()).Debug()
-			h.cacheDriver.Set(r.Request.URL.String(), data, time.Duration(h.config.CACHE_TTL)*time.Second)
+		// Cache the response if applicable
+		if h.config.USE_CACHE && (c.Request.Method == "GET" || c.Request.Method == "HEAD") && !strings.Contains(r.Header.Get("Cache-Control"), "no-cache") {
+			go h.cacheResponse(c, r.Request.URL.String(), r.Header, body)
 			r.Header.Set("X-Cache", "MISS")
 		}
 
@@ -113,5 +86,9 @@ func (h *Handler) FetchData(c *gin.Context) {
 		},
 	}
 
+	start := time.Now()
 	proxy.ServeHTTP(c.Writer, c.Request)
+	if duration := time.Since(start); duration.Milliseconds() > 500 {
+		logger.Logger("Backend too slow: ", duration.String(), c.Request.RequestURI).Warn()
+	}
 }

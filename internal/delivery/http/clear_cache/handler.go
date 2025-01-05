@@ -51,19 +51,21 @@ func (h *Handler) Clear(c *gin.Context) {
 	parsedURL.RawQuery = query.Encode()
 	fullUrl = parsedURL.String()
 	isPrefix := strings.ToLower(c.Query("is_prefix"))
-	if isPrefix == "true" {
-		h.cacheDriver.RemoveByPrefix(fullUrl)
-		h.cacheDriver.SetKey("mobile")
-		h.cacheDriver.RemoveByPrefix(fullUrl)
-		h.cacheDriver.SetKey("desktop")
-		h.cacheDriver.RemoveByPrefix(fullUrl)
-	} else {
-		h.cacheDriver.Remove(fullUrl)
-		h.cacheDriver.SetKey("mobile")
-		h.cacheDriver.Remove(fullUrl)
-		h.cacheDriver.SetKey("desktop")
-		h.cacheDriver.Remove(fullUrl)
-	}
+	go func() {
+		if isPrefix == "true" {
+			h.cacheDriver.RemoveByPrefix(fullUrl)
+			h.cacheDriver.SetKey("mobile")
+			h.cacheDriver.RemoveByPrefix(fullUrl)
+			h.cacheDriver.SetKey("desktop")
+			h.cacheDriver.RemoveByPrefix(fullUrl)
+		} else {
+			h.cacheDriver.Remove(fullUrl)
+			h.cacheDriver.SetKey("mobile")
+			h.cacheDriver.Remove(fullUrl)
+			h.cacheDriver.SetKey("desktop")
+			h.cacheDriver.Remove(fullUrl)
+		}
+	}()
 
 	c.JSON(200, map[string]interface{}{
 		"status": "OK",

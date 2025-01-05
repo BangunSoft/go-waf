@@ -7,6 +7,7 @@ import (
 	"log"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/sirupsen/logrus"
 )
@@ -21,9 +22,9 @@ const (
 )
 
 type logDriver struct {
-	driver *logrus.Logger
-
+	driver  *logrus.Logger
 	message interface{}
+	mu      sync.Mutex // Mutex for thread safety
 }
 
 var logger = &logDriver{
@@ -62,6 +63,9 @@ func Logger(logs ...interface{}) *logDriver {
 	}
 
 	_, filename, line, _ := runtime.Caller(1)
+	logger.mu.Lock() // Lock for thread safety
+	defer logger.mu.Unlock()
+
 	logger.message = map[string]interface{}{
 		"caller": fmt.Sprintf("%s:%d", filename, line),
 		"log":    logs,
@@ -78,43 +82,54 @@ func (l *logDriver) jsonize() {
 
 	message, err := json.Marshal(logger.message)
 	if err != nil {
-		log.Panicln("[panic] logger error. Causer: ", err)
+		l.driver.Error("Failed to marshal log message: " + err.Error())
+		return // Return without panicking
 	}
 
 	logger.message = string(message)
 }
 
 func (l *logDriver) Debug() {
+	l.mu.Lock() // Lock for thread safety
+	defer l.mu.Unlock()
 	if logger.message != nil {
-		l.driver.Debug(l.message)
-		l.message = nil
+		l.driver.Debug(logger.message)
+		logger.message = nil
 	}
 }
 
 func (l *logDriver) Info() {
+	l.mu.Lock() // Lock for thread safety
+	defer l.mu.Unlock()
 	if logger.message != nil {
-		l.driver.Info(l.message)
-		l.message = nil
+		l.driver.Info(logger.message)
+		logger.message = nil
 	}
 }
 
 func (l *logDriver) Warn() {
+	l.mu.Lock() // Lock for thread safety
+	defer l.mu.Unlock()
 	if logger.message != nil {
-		l.driver.Warn(l.message)
-		l.message = nil
+		l.driver.Warn(logger.message)
+		logger.message = nil
 	}
 }
 
 func (l *logDriver) Error() {
+	l.mu.Lock() // Lock for thread safety
+	defer l.mu.Unlock()
 	if logger.message != nil {
-		l.driver.Error(l.message)
-		l.message = nil
+		l.driver.Error(logger.message)
+		logger.message = nil
 	}
 }
 
 func (l *logDriver) Fatal() {
+	l.mu.Lock() // Lock for thread safety
+	defer l.mu.Unlock()
 	if logger.message != nil {
-		l.driver.Fatal(l.message)
-		l.message = nil
+		l.driver.Fatal(logger.message)
+		logger.message = nil
 	}
 }

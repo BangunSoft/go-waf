@@ -1,8 +1,6 @@
 package file_cache
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -10,22 +8,81 @@ import (
 
 	"github.com/jahrulnr/go-waf/internal/interface/repository"
 	"github.com/jahrulnr/go-waf/pkg/logger"
+	"github.com/vmihailenco/msgpack"
 )
 
 type FileCache struct {
-	cacheDir string
-	mu       sync.RWMutex
+	cacheDir      string
+	mu            sync.RWMutex
+	cleanupTicker *time.Ticker
+	stopChan      chan struct{}
 }
 
 // CacheItem represents an item stored in the cache, along with its expiration time.
 type CacheItem struct {
-	Value      []byte `json:"value"`
-	Expiration int64  `json:"expiration"` // Unix timestamp
+	Value      []byte
+	Expiration int64 // Unix timestamp
 }
 
 // NewFileCache creates a new FileCache instance with the specified directory.
 func NewFileCache(cacheDir string) repository.CacheInterface {
-	return &FileCache{cacheDir: cacheDir}
+	c := &FileCache{
+		cacheDir: cacheDir,
+		stopChan: make(chan struct{}),
+	}
+
+	// Start the cleanup goroutine
+	c.cleanupTicker = time.NewTicker(5 * time.Second) // Set cleanup interval
+	go c.scheduleCleanup()
+
+	return c
+}
+
+// scheduleCleanup removes expired items from the file cache periodically.
+func (c *FileCache) scheduleCleanup() {
+	for {
+		select {
+		case <-c.cleanupTicker.C:
+			c.cleanupExpiredItems()
+		case <-c.stopChan:
+			c.cleanupTicker.Stop()
+			return
+		}
+	}
+}
+
+// cleanupExpiredItems removes expired items from the cache.
+func (c *FileCache) cleanupExpiredItems() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	files, err := os.ReadDir(c.cacheDir)
+	if err != nil {
+		logger.Logger("[warn] Error reading cache directory: ", err).Warn()
+		return
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		cacheFilePath := filepath.Join(c.cacheDir, file.Name())
+		if c.isExpired(cacheFilePath) {
+			if err := os.Remove(cacheFilePath); err != nil {
+				logger.Logger("Error removing expired cache file: "+file.Name(), err).Warn()
+			}
+		}
+	}
+}
+
+// isExpired checks if the cache item is expired.
+func (c *FileCache) isExpired(cacheFilePath string) bool {
+	item, err := c.readCacheItem(cacheFilePath)
+	if err != nil {
+		return false
+	}
+	return time.Now().Unix() > item.Expiration
 }
 
 // Set adds a new item to the file cache with the specified key, value, and TTL.
@@ -33,23 +90,27 @@ func (c *FileCache) Set(key string, value []byte, ttl time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	serializedValue, err := json.Marshal(CacheItem{
+	item := CacheItem{
 		Value:      value,
-		Expiration: time.Now().Add(ttl).Unix(), // Set the expiration time
-	})
-	if err != nil {
-		logger.Logger("Error serializing value: ", err).Warn()
-		return
+		Expiration: time.Now().Add(ttl).Unix(),
 	}
 
 	cacheFilePath := c.getFilePath(key)
-	err = os.WriteFile(cacheFilePath, serializedValue, 0644)
-	if err != nil {
-		logger.Logger("Error writing to cache file: ", err).Warn()
+	if err := c.writeCacheItem(cacheFilePath, item); err != nil {
+		logger.Logger("Error writing to cache file for key: "+key, err).Warn()
 	}
+}
 
-	// Optionally, you can implement a mechanism to clean up expired files
-	go c.scheduleCleanup(key, ttl)
+// writeCacheItem writes the CacheItem to the specified file using MessagePack.
+func (c *FileCache) writeCacheItem(cacheFilePath string, item CacheItem) error {
+	file, err := os.Create(cacheFilePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	encoder := msgpack.NewEncoder(file)
+	return encoder.Encode(item)
 }
 
 // Get retrieves the value associated with the given key from the file cache.
@@ -58,19 +119,8 @@ func (c *FileCache) Get(key string) ([]byte, bool) {
 	defer c.mu.RUnlock()
 
 	cacheFilePath := c.getFilePath(key)
-	data, err := os.ReadFile(cacheFilePath)
+	item, err := c.readCacheItem(cacheFilePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, false // Key does not exist
-		}
-		logger.Logger("Error reading cache file: ", err).Warn()
-		return nil, false
-	}
-
-	var item CacheItem
-	err = json.Unmarshal(data, &item)
-	if err != nil {
-		logger.Logger("Error deserializing value: ", err).Error()
 		return nil, false
 	}
 
@@ -83,31 +133,42 @@ func (c *FileCache) Get(key string) ([]byte, bool) {
 	return item.Value, true
 }
 
+// readCacheItem reads the CacheItem from the specified file using MessagePack.
+func (c *FileCache) readCacheItem(cacheFilePath string) (CacheItem, error) {
+	file, err := os.Open(cacheFilePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return CacheItem{}, err // Key does not exist
+		}
+		logger.Logger("Error reading cache file: "+cacheFilePath, err).Warn()
+		return CacheItem{}, err
+	}
+	defer file.Close()
+
+	var item CacheItem
+	decoder := msgpack.NewDecoder(file)
+	if err := decoder.Decode(&item); err != nil {
+		logger.Logger("Error deserializing cache item: "+cacheFilePath, err).Error()
+		return CacheItem{}, err
+	}
+
+	return item, nil
+}
+
 // Pop removes and returns the item with the specified key from the file cache.
 func (c *FileCache) Pop(key string) ([]byte, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	cacheFilePath := c.getFilePath(key)
-	data, err := os.ReadFile(cacheFilePath)
+	item, err := c.readCacheItem(cacheFilePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, false // Key does not exist
-		}
-		logger.Logger("Error reading cache file: ", err).Error()
 		return nil, false
 	}
 
-	err = os.Remove(cacheFilePath)
-	if err != nil {
-		logger.Logger("Error removing cache file: ", err).Error()
-	}
-
-	var item CacheItem
-	err = json.Unmarshal(data, &item)
-	if err != nil {
-		logger.Logger("Error deserializing value: ", err).Error()
-		return nil, false
+	// Remove the cache file
+	if err := os.Remove(cacheFilePath); err != nil {
+		logger.Logger("Error removing cache file for key: "+key, err).Error()
 	}
 
 	// Check if the item is expired
@@ -124,33 +185,29 @@ func (c *FileCache) Remove(key string) {
 	defer c.mu.Unlock()
 
 	cacheFilePath := c.getFilePath(key)
-	err := os.Remove(cacheFilePath)
-	if err != nil {
-		logger.Logger("Error removing cache file: ", err).Warn()
+	if err := os.Remove(cacheFilePath); err != nil {
+		logger.Logger("Error removing cache file for key: "+key, err).Warn()
 	}
 }
 
+// RemoveByPrefix removes all items with the specified prefix from the file cache.
 func (c *FileCache) RemoveByPrefix(prefix string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// For file cache, you need to implement logic to iterate through the files
-	// Assuming the file cache uses a specific directory to store cache files
 	files, err := os.ReadDir(c.cacheDir)
 	if err != nil {
 		logger.Logger("[warn] Error reading cache directory: ", err).Warn()
 		return
 	}
 
-	prefixN := len(prefix)
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
-		if len(file.Name()) >= prefixN && file.Name()[:prefixN] == prefix {
-			err = os.Remove(c.cacheDir + file.Name())
-			if err != nil {
-				logger.Logger("[warn] Error deleting cache file: ", err).Warn()
+		if len(file.Name()) >= len(prefix) && file.Name()[:len(prefix)] == prefix {
+			if err := os.Remove(filepath.Join(c.cacheDir, file.Name())); err != nil {
+				logger.Logger("[warn] Error deleting cache file for key: "+file.Name(), err).Warn()
 			}
 		}
 	}
@@ -162,20 +219,9 @@ func (c *FileCache) GetTTL(key string) (time.Duration, bool) {
 	defer c.mu.RUnlock()
 
 	cacheFilePath := c.getFilePath(key)
-	data, err := os.ReadFile(cacheFilePath)
+	item, err := c.readCacheItem(cacheFilePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return 0, false // Key does not exist
-		}
-		logger.Logger("Error reading cache file: ", err).Error()
-		return 0, false
-	}
-
-	var item CacheItem
-	err = json.Unmarshal(data, &item)
-	if err != nil {
-		logger.Logger("Error deserializing value: ", err).Error()
-		return 0, false
+		return 0, false // Key does not exist
 	}
 
 	// Calculate remaining TTL
@@ -189,11 +235,10 @@ func (c *FileCache) GetTTL(key string) (time.Duration, bool) {
 
 // getFilePath constructs the file path for a given key.
 func (c *FileCache) getFilePath(key string) string {
-	return filepath.Join(c.cacheDir, fmt.Sprintf("%s.cache", key))
+	return filepath.Join(c.cacheDir, key+".cache")
 }
 
-// scheduleCleanup removes the file after the TTL expires.
-func (c *FileCache) scheduleCleanup(key string, ttl time.Duration) {
-	time.Sleep(ttl)
-	c.Remove(key)
+// Stop stops the cleanup goroutine.
+func (c *FileCache) Stop() {
+	close(c.stopChan)
 }

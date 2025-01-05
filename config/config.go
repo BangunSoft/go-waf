@@ -22,6 +22,11 @@ type Config struct {
 	RATELIMIT_SECOND int  `env:"RATELIMIT_SECOND" env-default:"1"`
 	RATELIMIT_MAX    uint `env:"RATELIMIT_MAX" env-default:"5"`
 
+	USE_WAF            bool   `env:"USE_WAF" env-default:"true"`
+	WAF_CONFIG         string `env:"WAF_CONFIG" env-default:"config/keywords.yml"`
+	WAF_PROTECT_HEADER bool   `env:"WAF_PROTECT_HEADER" env-default:"true"`
+	WAF_PROTECT_BODY   bool   `env:"WAF_PROTECT_BODY" env-default:"false"`
+
 	USE_CACHE             bool   `env:"USE_CACHE" env-default:"false"`
 	CACHE_TTL             int    `env:"CACHE_TTL" env-default:"1209600"` // default 2 week
 	CACHE_DRIVER          string `env:"CACHE_DRIVER" env-default:"memory"`

@@ -18,7 +18,7 @@ func NewCheckDevice(config *config.Config) *Device {
 }
 
 func (m *Device) SendHeader() gin.HandlerFunc {
-	detector, err := devicedetector.NewDeviceDetector("devices")
+	detector, err := devicedetector.NewDeviceDetector("config/devices")
 
 	return func(c *gin.Context) {
 		if err != nil {

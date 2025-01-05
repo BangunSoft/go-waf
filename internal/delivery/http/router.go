@@ -9,6 +9,8 @@ import (
 	"github.com/jahrulnr/go-waf/internal/interface/service"
 	"github.com/jahrulnr/go-waf/internal/middleware/device"
 	"github.com/jahrulnr/go-waf/internal/middleware/ratelimit"
+	"github.com/jahrulnr/go-waf/internal/middleware/waf"
+	service_waf "github.com/jahrulnr/go-waf/internal/service/waf"
 	"github.com/jahrulnr/go-waf/pkg/logger"
 	"github.com/nanmu42/gzip"
 
@@ -35,6 +37,11 @@ func NewHttpRouter(config *config.Config, cacheHandler service.CacheInterface) *
 
 func (h *Router) setRouter() {
 	var middlewareList []gin.HandlerFunc
+
+	if h.config.USE_WAF {
+		wafService := service_waf.NewWAFService(h.config, h.config.WAF_CONFIG)
+		middlewareList = append(middlewareList, waf.NewWAFMiddleware(wafService))
+	}
 
 	// this will used for clear cache
 	h.handler.HandleMethodNotAllowed = h.config.USE_CACHE

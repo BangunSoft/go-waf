@@ -1,6 +1,8 @@
 package ratelimit
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,7 +19,8 @@ import (
 )
 
 type RateLimit struct {
-	config *config.Config
+	config  *config.Config
+	page429 []byte
 
 	driver string
 	store  ratelimit.Store
@@ -29,13 +32,31 @@ type RateLimit struct {
 
 func NewRateLimit(config *config.Config) *RateLimit {
 	return &RateLimit{
-		config: config,
+		config:  config,
+		page429: nil,
 	}
 }
 
 func (s *RateLimit) initialize() {
 	s.rate = time.Duration(s.config.RATELIMIT_SECOND) * time.Second
 	s.limit = s.config.RATELIMIT_MAX
+
+	file, err := os.OpenFile("views/429.html", os.O_RDONLY, 0600)
+	if err != nil {
+		logger.Logger(err).Warn()
+		return
+	}
+	defer file.Close()
+
+	reader := bufio.NewReader(file)
+	var page bytes.Buffer
+	_, err = io.Copy(&page, reader)
+	if err != nil {
+		logger.Logger(err).Warn()
+		return
+	}
+
+	s.page429 = page.Bytes()
 }
 
 func (s *RateLimit) Driver(driver string) {
@@ -47,18 +68,14 @@ func (s *RateLimit) keyFunc(c *gin.Context) string {
 }
 
 func (s *RateLimit) errorHandler(c *gin.Context, info ratelimit.Info) {
-	file, err := os.OpenFile("views/429.html", os.O_RDONLY, 0600)
-	if err != nil {
-		logger.Logger(err).Warn()
+	if s.page429 == nil {
 		c.String(http.StatusTooManyRequests, "429 | Too many request.")
+		c.Abort()
 		return
 	}
-	defer file.Close()
 
-	page, err := io.ReadAll(file)
-	logger.Logger(err).Fatal()
-
-	c.Data(http.StatusTooManyRequests, "text/html", page)
+	c.Data(http.StatusTooManyRequests, "text/html", s.page429)
+	c.Abort()
 }
 
 func (s *RateLimit) RateLimit() gin.HandlerFunc {
