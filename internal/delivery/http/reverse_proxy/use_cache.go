@@ -1,24 +1,46 @@
 package http_reverseproxy_handler
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jahrulnr/go-waf/pkg/logger"
+	"github.com/vmihailenco/msgpack"
 )
 
-func (h *Handler) UseCache(c *gin.Context) {
-	url := h.config.HOST_DESTINATION + c.Request.URL.String()
-
-	// Set device key for cache if applicable
-	if deviceKey := c.GetHeader("X-Device"); deviceKey != "" && h.config.DETECT_DEVICE && h.config.SPLIT_CACHE_BY_DEVICE {
+// cacheResponse caches the response data using MessagePack.
+func (h *Handler) cacheResponse(c *gin.Context, url string, headers http.Header, body []byte) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if deviceKey := h.getDeviceKey(c); deviceKey != "" {
 		h.cacheDriver.SetKey(deviceKey)
 	}
 
-	// Attempt to get cache
+	cacheData := &CacheHandler{
+		CacheURL:     url,
+		CacheHeaders: headers,
+		CacheData:    body,
+	}
+	data, err := msgpack.Marshal(cacheData) // Use MessagePack for serialization
+	if err != nil {
+		logger.Logger("[error] Failed to marshal cache data: ", err).Error()
+		return
+	}
+
+	logger.Logger("[debug]", "Set new cache "+url).Debug()
+	h.cacheDriver.Set(url, data, time.Duration(h.config.CACHE_TTL)*time.Second)
+}
+
+// UseCache retrieves cached data or fetches it if not found.
+func (h *Handler) UseCache(c *gin.Context) {
+	url := h.config.HOST_DESTINATION + c.Request.URL.String()
+
+	if deviceKey := h.getDeviceKey(c); deviceKey != "" {
+		h.cacheDriver.SetKey(deviceKey)
+	}
+
 	getCache, ok := h.cacheDriver.Get(url)
 	if !ok {
 		logger.Logger("[debug] cache not found", url).Debug()
@@ -27,46 +49,28 @@ func (h *Handler) UseCache(c *gin.Context) {
 	}
 
 	var cacheData CacheHandler
-	if err := json.Unmarshal(getCache, &cacheData); err != nil {
-		logger.Logger("[debug] cannot cast cache data to CacheHandler, trying with map[string]interface{}", err).Debug()
+	if err := msgpack.Unmarshal(getCache, &cacheData); err != nil { // Use MessagePack for deserialization
+		logger.Logger("[error] Failed to unmarshal cache data: ", err).Error()
+		go h.cacheDriver.Remove(url)
+		h.FetchData(c)
+		return
+	}
 
-		// Attempt to unmarshal into a map
-		var data map[string]interface{}
-		if err = json.Unmarshal(getCache, &data); err != nil {
-			logger.Logger("[debug] I can't explain this error. err: ", err).Warn()
-			return
-		}
-
-		// Decode cache data
-		if encodedData, ok := data["data"].(string); ok {
-			cacheData.CacheData, _ = base64.StdEncoding.DecodeString(encodedData)
-		}
-
-		// Set headers from cache
-		if cacheHeaders, ok := data["headers"].(map[string]interface{}); ok {
-			for key, headers := range cacheHeaders {
-				if headerList, ok := headers.([]interface{}); ok && len(headerList) > 0 {
-					c.Header(key, headerList[0].(string))
-				}
-			}
-		}
-	} else {
-		logger.Logger("[debug] cast cache data to CacheHandler").Debug()
-
-		// Set headers from cacheData
-		for key, headers := range cacheData.CacheHeaders {
-			if len(headers) > 0 {
-				c.Header(key, headers[0])
-			}
+	// Set headers from cacheData
+	for key, headers := range cacheData.CacheHeaders {
+		if len(headers) > 0 {
+			c.Header(key, headers[0])
 		}
 	}
 
 	// Check and manage TTL
 	ttl, _ := h.cacheDriver.GetTTL(url)
 	ttl = time.Duration(h.config.CACHE_TTL) - (ttl / time.Second)
-	if ttl < 0 {
-		h.cacheDriver.Remove(url)
-	}
+	go func() {
+		if ttl <= 0 {
+			h.cacheDriver.Remove(url)
+		}
+	}()
 
 	// Manage headers
 	if h.config.ENABLE_GZIP {
@@ -80,5 +84,5 @@ func (h *Handler) UseCache(c *gin.Context) {
 	c.Header("X-Age", fmt.Sprintf("%d", ttl))
 
 	// Send cached data
-	c.Data(200, c.GetHeader("Content-Type"), cacheData.CacheData)
+	c.Data(http.StatusOK, c.GetHeader("Content-Type"), cacheData.CacheData)
 }

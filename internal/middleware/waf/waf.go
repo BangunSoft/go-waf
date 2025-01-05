@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jahrulnr/go-waf/internal/interface/service"
-	"github.com/jahrulnr/go-waf/pkg/logger"
 )
 
 type WAFMiddleware struct {
@@ -18,7 +17,7 @@ func NewWAFMiddleware(wafService service.WAFInterface) gin.HandlerFunc {
 			IP:      c.Request.RemoteAddr,
 			Path:    c.Request.RequestURI,
 			Headers: make(map[string]string),
-			Body:    []byte{}, // You can read the body if needed
+			Body:    []byte{},
 		}
 
 		// Read the request body
@@ -36,7 +35,6 @@ func NewWAFMiddleware(wafService service.WAFInterface) gin.HandlerFunc {
 		}
 
 		request.Headers["RequestURI"] = request.Path
-		logger.Logger(request.Headers).Debug()
 		response, err := wafService.HandleRequest(request)
 		if err != nil {
 			c.String(500, "Error: Internal Server Error")

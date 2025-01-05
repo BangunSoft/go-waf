@@ -24,16 +24,11 @@ func NewCache(ctx context.Context, redisClient *redis.Client) repository.CacheIn
 	}
 }
 
-// logError is a helper function for logging errors with context.
-func (c *TTLCache) logError(action, key string, err error) {
-	logger.Logger("Error "+action+" for key: "+key, err).Error()
-}
-
 // Set adds a new item to the Redis cache with the specified key, value, and TTL.
 func (c *TTLCache) Set(key string, value []byte, ttl time.Duration) {
 	err := c.client.Set(c.ctx, key, value, ttl).Err()
 	if err != nil {
-		c.logError("setting value in Redis", key, err)
+		logger.Logger("Error setting value in Redis for key: "+key, err.Error()).Error()
 	}
 }
 
@@ -43,7 +38,7 @@ func (c *TTLCache) Get(key string) ([]byte, bool) {
 	if err == redis.Nil {
 		return nil, false // Key does not exist
 	} else if err != nil {
-		c.logError("getting value from Redis", key, err)
+		logger.Logger("Error getting value in Redis for key: " + key + ", error: " + err.Error()).Error()
 		return nil, false
 	}
 
@@ -56,7 +51,7 @@ func (c *TTLCache) Pop(key string) ([]byte, bool) {
 	if err == redis.Nil {
 		return nil, false // Key does not exist
 	} else if err != nil {
-		c.logError("popping value from Redis", key, err)
+		logger.Logger("Error popping value in Redis for key: "+key, err.Error()).Error()
 		return nil, false
 	}
 
@@ -67,7 +62,7 @@ func (c *TTLCache) Pop(key string) ([]byte, bool) {
 func (c *TTLCache) Remove(key string) {
 	err := c.client.Del(c.ctx, key).Err()
 	if err != nil {
-		c.logError("removing key from Redis", key, err)
+		logger.Logger("Error removing key from Redis for key: "+key, err.Error()).Error()
 	}
 }
 
@@ -77,7 +72,7 @@ func (c *TTLCache) RemoveByPrefix(prefix string) {
 	for {
 		keys, newCursor, err := c.client.Scan(c.ctx, cursor, prefix+"*", 0).Result()
 		if err != nil {
-			c.logError("retrieving keys from Redis with prefix", prefix, err)
+			logger.Logger("Error retrieving keys from Redis with prefix for key: "+prefix, err.Error()).Error()
 			return
 		}
 
@@ -88,7 +83,7 @@ func (c *TTLCache) RemoveByPrefix(prefix string) {
 				pipe.Del(c.ctx, key)
 			}
 			if _, err := pipe.Exec(c.ctx); err != nil {
-				c.logError("deleting keys from Redis with prefix", prefix, err)
+				logger.Logger("Error deleting keys from Redis with prefix for key: "+prefix, err.Error()).Error()
 			}
 		}
 
@@ -105,7 +100,7 @@ func (c *TTLCache) GetTTL(key string) (time.Duration, bool) {
 	if err == redis.Nil {
 		return 0, false // Key does not exist
 	} else if err != nil {
-		c.logError("getting TTL from Redis for key", key, err)
+		logger.Logger("Error getting TTL from Redis for key: "+key, err.Error()).Error()
 		return 0, false
 	}
 

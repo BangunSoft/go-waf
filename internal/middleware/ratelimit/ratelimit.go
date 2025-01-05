@@ -42,17 +42,21 @@ func (s *RateLimit) initialize() {
 	s.limit = s.config.RATELIMIT_MAX
 
 	file, err := os.OpenFile("views/429.html", os.O_RDONLY, 0600)
-	if err == nil {
-		defer file.Close()
-
-		reader := bufio.NewReader(file)
-		var page bytes.Buffer
-		_, err = io.Copy(&page, reader)
-		if err != nil {
-			s.page429 = page.Bytes()
-			logger.Logger(err).Warn()
-		}
+	if err != nil {
+		logger.Logger(err).Warn()
+		return
 	}
+	defer file.Close()
+
+	reader := bufio.NewReader(file)
+	var page bytes.Buffer
+	_, err = io.Copy(&page, reader)
+	if err != nil {
+		logger.Logger(err).Warn()
+		return
+	}
+
+	s.page429 = page.Bytes()
 }
 
 func (s *RateLimit) Driver(driver string) {

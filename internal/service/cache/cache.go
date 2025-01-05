@@ -26,6 +26,7 @@ type CacheService struct {
 	key    string
 }
 
+// NewCacheService initializes a new CacheService based on the provided configuration.
 func NewCacheService(config *config.Config) service.CacheInterface {
 	var driver repository.CacheInterface
 	ctx := context.Background() // Create a context for Redis operations
@@ -33,10 +34,14 @@ func NewCacheService(config *config.Config) service.CacheInterface {
 	switch config.CACHE_DRIVER {
 	case "redis":
 		rds := redis.NewClient(&redis.Options{
-			Addr:     config.REDIS_ADDR,
-			Username: config.REDIS_USER,
-			Password: config.REDIS_PASS,
-			DB:       config.REDIS_DB, // use default DB
+			Addr:         config.REDIS_ADDR,
+			Username:     config.REDIS_USER,
+			Password:     config.REDIS_PASS,
+			DB:           config.REDIS_DB, // use default DB
+			PoolSize:     50,
+			DialTimeout:  30 * time.Second,
+			ReadTimeout:  30 * time.Second,
+			WriteTimeout: 30 * time.Second,
 		})
 		driver = redis_cache.NewCache(ctx, rds)
 	case "file":
@@ -56,10 +61,12 @@ func NewCacheService(config *config.Config) service.CacheInterface {
 	}
 }
 
+// SetKey sets the base key prefix for cache keys.
 func (s *CacheService) SetKey(key string) {
 	s.key = "gowaf-" + key + "-"
 }
 
+// generateKey generates a cache key based on the provided key.
 func (s *CacheService) generateKey(key string) string {
 	parseUrl, err := url.Parse(key)
 	if err != nil {
@@ -86,11 +93,13 @@ func (s *CacheService) generateKey(key string) string {
 	return newKey
 }
 
+// Set stores a value in the cache with a specified duration.
 func (s *CacheService) Set(key string, value []byte, duration time.Duration) {
 	generatedKey := s.generateKey(key)
-	s.driver.Set(generatedKey, value, duration)
+	s.driver.Set(generatedKey, value, duration) // No error handling to avoid duplicate logging
 }
 
+// Get retrieves a value from the cache.
 func (s *CacheService) Get(key string) ([]byte, bool) {
 	generatedKey := s.generateKey(key)
 	value, ok := s.driver.Get(generatedKey)
@@ -100,21 +109,25 @@ func (s *CacheService) Get(key string) ([]byte, bool) {
 	return value, ok
 }
 
+// Pop removes and returns a value from the cache.
 func (s *CacheService) Pop(key string) ([]byte, bool) {
 	generatedKey := s.generateKey(key)
 	return s.driver.Pop(generatedKey)
 }
 
+// Remove deletes a value from the cache.
 func (s *CacheService) Remove(key string) {
 	generatedKey := s.generateKey(key)
-	s.driver.Remove(generatedKey)
+	s.driver.Remove(generatedKey) // No error handling to avoid duplicate logging
 }
 
+// RemoveByPrefix deletes all values with the specified prefix from the cache.
 func (s *CacheService) RemoveByPrefix(prefix string) {
 	generatedKey := s.generateKey(prefix)
-	s.driver.RemoveByPrefix(generatedKey)
+	s.driver.RemoveByPrefix(generatedKey) // No error handling to avoid duplicate logging
 }
 
+// GetTTL retrieves the remaining time-to-live for a cache key.
 func (s *CacheService) GetTTL(key string) (time.Duration, bool) {
 	generatedKey := s.generateKey(key)
 	return s.driver.GetTTL(generatedKey)
