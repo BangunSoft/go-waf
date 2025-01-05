@@ -1,0 +1,19 @@
+command_injection:
+  - "&&"
+  - "||"
+  - "|"
+  - "`"
+  - "exec"
+  - "system"
+  - "cmd"
+  - "shell"
+  - "bash"
+
+path_traversal:
+  - "../"
+  - "..\\"
+  - "..%2F"
+  - "..%5C"
+  - "%2E%2E%2F"
+  - "%2E%2E%5C"
+  - "%3Cscript%3E"
