@@ -39,56 +39,48 @@ func (h *Handler) FetchData(c *gin.Context) {
 	}
 
 	proxy.ModifyResponse = func(r *http.Response) error {
+		// Stream the response directly to the client
+		if r.StatusCode != http.StatusOK {
+			return nil // No need to cache non-200 responses
+		}
+
+		// Create a buffer to hold the modified body
+		var bodyBuffer bytes.Buffer
 		defer r.Body.Close()
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
+
+		// Use io.Copy to stream the response body
+		if _, err := io.Copy(&bodyBuffer, r.Body); err != nil {
 			logger.Logger(err).Warn()
 			return err
 		}
 
+		// Replace the host in the body
+		body := bodyBuffer.Bytes()
 		scheme := c.Request.URL.Scheme
 		if scheme == "" {
 			scheme = "http"
 		}
 
-		// replace scheme://host to local host
-		body = bytes.ReplaceAll(
-			body,
-			[]byte(h.config.HOST_DESTINATION),
-			[]byte(fmt.Sprintf("%s://%s", scheme, c.Request.Host)),
-		)
+		body = bytes.ReplaceAll(body, []byte(h.config.HOST_DESTINATION), []byte(fmt.Sprintf("%s://%s", scheme, c.Request.Host)))
 
-		// replace //host to local host
-		body = bytes.ReplaceAll(
-			body,
-			[]byte(fmt.Sprintf("\"//%s", h.config.HOST_DESTINATION)),
-			[]byte(fmt.Sprintf("\"%s://%s", scheme, c.Request.Host)),
-		)
-		body = bytes.ReplaceAll(
-			body,
-			[]byte(fmt.Sprintf("'//%s", h.config.HOST_DESTINATION)),
-			[]byte(fmt.Sprintf("'%s://%s", scheme, c.Request.Host)),
-		)
-
+		// Set the modified body back to the response
 		r.Body = io.NopCloser(bytes.NewReader(body))
 		r.ContentLength = int64(len(body))
 
-		// remove duplicate header
+		// Remove unnecessary headers
 		if h.config.ENABLE_GZIP {
 			r.Header.Del("Accept-Encoding")
 			r.Header.Del("Vary")
 		}
 
-		// modify header
+		// Modify headers
 		r.Header.Set("Content-Length", strconv.Itoa(len(body)))
 		r.Header.Del("Via")
 		r.Header.Del("Server")
 		r.Header.Del("X-Varnish")
 
-		if h.config.USE_CACHE && r.StatusCode == 200 &&
-			(c.Request.Method == "GET" || c.Request.Method == "HEAD") &&
-			!strings.Contains(r.Header.Get("Cache-Control"), "max-age=0") &&
-			!strings.Contains(r.Header.Get("Cache-Control"), "no-cache") {
+		// Cache the response if applicable
+		if h.config.USE_CACHE && (c.Request.Method == "GET" || c.Request.Method == "HEAD") && !strings.Contains(r.Header.Get("Cache-Control"), "no-cache") {
 			go func() {
 				if deviceKey := c.GetHeader("X-Device"); deviceKey != "" && h.config.DETECT_DEVICE && h.config.SPLIT_CACHE_BY_DEVICE {
 					h.cacheDriver.SetKey(deviceKey)
@@ -99,7 +91,7 @@ func (h *Handler) FetchData(c *gin.Context) {
 					CacheData:    body,
 				}
 				data, _ := json.Marshal(cacheData)
-				logger.Logger("[debug]", "Set new cache"+r.Request.URL.String()).Debug()
+				logger.Logger("[debug]", "Set new cache "+r.Request.URL.String()).Debug()
 				h.cacheDriver.Set(r.Request.URL.String(), data, time.Duration(h.config.CACHE_TTL)*time.Second)
 			}()
 			r.Header.Set("X-Cache", "MISS")

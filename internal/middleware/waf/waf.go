@@ -36,7 +36,7 @@ func NewWAFMiddleware(wafService service.WAFInterface) gin.HandlerFunc {
 		}
 
 		request.Headers["RequestURI"] = request.Path
-		logger.Logger(request.Headers).Info()
+		logger.Logger(request.Headers).Debug()
 		response, err := wafService.HandleRequest(request)
 		if err != nil {
 			c.String(500, "Error: Internal Server Error")

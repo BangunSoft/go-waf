@@ -21,7 +21,6 @@ type Router struct {
 	config  *config.Config
 	handler *gin.Engine
 
-	wafHandler   service.WAFInterface
 	rateLimiter  *ratelimit.RateLimit
 	cacheHandler service.CacheInterface
 }
@@ -37,12 +36,11 @@ func NewHttpRouter(config *config.Config, cacheHandler service.CacheInterface) *
 }
 
 func (h *Router) setRouter() {
-	// var middlewareList []gin.HandlerFunc
+	var middlewareList []gin.HandlerFunc
 
 	if h.config.USE_WAF {
 		wafService := service_waf.NewWAFService(h.config, h.config.WAF_CONFIG)
-		// middlewareList = append(middlewareList, waf.NewWAFMiddleware(wafService))
-		h.handler.Use(waf.NewWAFMiddleware(wafService))
+		middlewareList = append(middlewareList, waf.NewWAFMiddleware(wafService))
 	}
 
 	// this will used for clear cache
@@ -55,8 +53,7 @@ func (h *Router) setRouter() {
 		} else {
 			h.rateLimiter.Driver("memory")
 		}
-		// middlewareList = append(middlewareList, h.rateLimiter.RateLimit())
-		h.handler.Use(h.rateLimiter.RateLimit())
+		middlewareList = append(middlewareList, h.rateLimiter.RateLimit())
 	}
 
 	// gzip compress
@@ -79,19 +76,17 @@ func (h *Router) setRouter() {
 			}
 		}
 
-		// middlewareList = append(middlewareList, gzipHandler)
-		h.handler.Use(gzipHandler)
+		middlewareList = append(middlewareList, gzipHandler)
 	}
 
 	if h.config.DETECT_DEVICE {
 		deviceHandler := device.NewCheckDevice(h.config)
-		// middlewareList = append(middlewareList, deviceHandler.SendHeader())
-		h.handler.Use(deviceHandler.SendHeader())
+		middlewareList = append(middlewareList, deviceHandler.SendHeader())
 	}
 
-	// if len(middlewareList) > 0 {
-	// 	h.handler.Use(middlewareList...)
-	// }
+	if len(middlewareList) > 0 {
+		h.handler.Use(middlewareList...)
+	}
 
 	// initial handler
 	proxyHandler := http_reverseproxy_handler.NewHttpHandler(h.config, h.handler, h.cacheHandler)

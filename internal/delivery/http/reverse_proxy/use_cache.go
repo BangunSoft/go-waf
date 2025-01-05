@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,9 +27,8 @@ func (h *Handler) UseCache(c *gin.Context) {
 	}
 
 	var cacheData CacheHandler
-	err := json.Unmarshal(getCache, &cacheData)
-	if err != nil {
-		logger.Logger("[debug] cannot cast cache data to CacheHandler, cache data type is ", reflect.TypeOf(getCache), ". Trying with map[string]interface{}").Debug()
+	if err := json.Unmarshal(getCache, &cacheData); err != nil {
+		logger.Logger("[debug] cannot cast cache data to CacheHandler, trying with map[string]interface{}", err).Debug()
 
 		// Attempt to unmarshal into a map
 		var data map[string]interface{}
