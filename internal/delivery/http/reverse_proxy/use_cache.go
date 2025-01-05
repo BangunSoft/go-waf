@@ -14,11 +14,13 @@ import (
 func (h *Handler) UseCache(c *gin.Context) {
 	url := h.config.HOST_DESTINATION + c.Request.URL.String()
 
+	// Set device key for cache if applicable
 	if deviceKey := c.GetHeader("X-Device"); deviceKey != "" && h.config.DETECT_DEVICE && h.config.SPLIT_CACHE_BY_DEVICE {
 		h.cacheDriver.SetKey(deviceKey)
 	}
-	getCache, ok := h.cacheDriver.Get(url)
 
+	// Attempt to get cache
+	getCache, ok := h.cacheDriver.Get(url)
 	if !ok {
 		logger.Logger("[debug] cache not found", url).Debug()
 		h.FetchData(c)
@@ -29,26 +31,31 @@ func (h *Handler) UseCache(c *gin.Context) {
 	err := json.Unmarshal(getCache, &cacheData)
 	if err != nil {
 		logger.Logger("[debug] cannot cast cache data to CacheHandler, cache data type is ", reflect.TypeOf(getCache), ". Trying with map[string]interface{}").Debug()
-		cacheData = CacheHandler{}
+
+		// Attempt to unmarshal into a map
 		var data map[string]interface{}
-		err = json.Unmarshal(getCache, &data)
-		if err != nil {
+		if err = json.Unmarshal(getCache, &data); err != nil {
 			logger.Logger("[debug] I can't explain this error. err: ", err).Warn()
+			return
 		}
 
-		cacheHeaders, _ := data["headers"].(map[string]interface{})
-		cacheData.CacheData, _ = base64.StdEncoding.DecodeString(data["data"].(string))
+		// Decode cache data
+		if encodedData, ok := data["data"].(string); ok {
+			cacheData.CacheData, _ = base64.StdEncoding.DecodeString(encodedData)
+		}
 
-		// set header
-		for key, headers := range cacheHeaders {
-			header := headers.([]interface{})
-			if len(header) > 0 {
-				c.Header(key, header[0].(string))
+		// Set headers from cache
+		if cacheHeaders, ok := data["headers"].(map[string]interface{}); ok {
+			for key, headers := range cacheHeaders {
+				if headerList, ok := headers.([]interface{}); ok && len(headerList) > 0 {
+					c.Header(key, headerList[0].(string))
+				}
 			}
 		}
 	} else {
 		logger.Logger("[debug] cast cache data to CacheHandler").Debug()
-		// set header
+
+		// Set headers from cacheData
 		for key, headers := range cacheData.CacheHeaders {
 			if len(headers) > 0 {
 				c.Header(key, headers[0])
@@ -56,23 +63,24 @@ func (h *Handler) UseCache(c *gin.Context) {
 		}
 	}
 
+	// Check and manage TTL
 	ttl, _ := h.cacheDriver.GetTTL(url)
 	ttl = time.Duration(h.config.CACHE_TTL) - (ttl / time.Second)
 	if ttl < 0 {
 		h.cacheDriver.Remove(url)
 	}
 
-	// remove duplicate header
+	// Manage headers
 	if h.config.ENABLE_GZIP {
 		c.Header("Accept-Encoding", "")
 		c.Header("Vary", "")
 	}
-
-	// remove some header
 	c.Header("Via", "")
 	c.Header("Server", "")
 	c.Header("X-Varnish", "")
 	c.Header("X-Cache", "HIT")
 	c.Header("X-Age", fmt.Sprintf("%d", ttl))
+
+	// Send cached data
 	c.Data(200, c.GetHeader("Content-Type"), cacheData.CacheData)
 }

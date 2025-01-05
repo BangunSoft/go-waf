@@ -89,17 +89,19 @@ func (h *Handler) FetchData(c *gin.Context) {
 			(c.Request.Method == "GET" || c.Request.Method == "HEAD") &&
 			!strings.Contains(r.Header.Get("Cache-Control"), "max-age=0") &&
 			!strings.Contains(r.Header.Get("Cache-Control"), "no-cache") {
-			if deviceKey := c.GetHeader("X-Device"); deviceKey != "" && h.config.DETECT_DEVICE && h.config.SPLIT_CACHE_BY_DEVICE {
-				h.cacheDriver.SetKey(deviceKey)
-			}
-			cacheData := &CacheHandler{
-				CacheURL:     r.Request.URL.String(),
-				CacheHeaders: r.Header,
-				CacheData:    body,
-			}
-			data, _ := json.Marshal(cacheData)
-			logger.Logger("[debug]", "Set new cache"+r.Request.URL.String()).Debug()
-			h.cacheDriver.Set(r.Request.URL.String(), data, time.Duration(h.config.CACHE_TTL)*time.Second)
+			go func() {
+				if deviceKey := c.GetHeader("X-Device"); deviceKey != "" && h.config.DETECT_DEVICE && h.config.SPLIT_CACHE_BY_DEVICE {
+					h.cacheDriver.SetKey(deviceKey)
+				}
+				cacheData := &CacheHandler{
+					CacheURL:     r.Request.URL.String(),
+					CacheHeaders: r.Header,
+					CacheData:    body,
+				}
+				data, _ := json.Marshal(cacheData)
+				logger.Logger("[debug]", "Set new cache"+r.Request.URL.String()).Debug()
+				h.cacheDriver.Set(r.Request.URL.String(), data, time.Duration(h.config.CACHE_TTL)*time.Second)
+			}()
 			r.Header.Set("X-Cache", "MISS")
 		}
 
