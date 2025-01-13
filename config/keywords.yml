@@ -4,7 +4,6 @@ command_injection:
   - "|"
   - "`"
   - "exec"
-  - "system"
   - "cmd"
   - "shell"
   - "bash"
